@@ -1,0 +1,25 @@
+# Research store configuration (Phase 1).
+# Data, not code: edit values here, never in research_store.py.
+
+[data]
+start_date = "2007-01-01"   # first calendar day requested from Yahoo Finance
+end_date   = "2025-12-31"    # last calendar day requested (exclusive upper bound handled in code)
+db_path    = "data/research_store.db"  # relative to this file's directory
+max_gap_days = 5             # consecutive trading rows farther apart than this are flagged, not filled
+
+# 20 large-cap US equities, one entry per GICS sector group, all with full
+# daily history from Jan 2007. Post-2007 IPOs (META, TSLA, V) are deliberately
+# excluded so every series spans the full range. Survivorship bias is a
+# disclosed, accepted limitation (see .claude/context/architecture.md).
+[data.basket]
+information_technology  = ["AAPL", "MSFT", "NVDA"]
+communication_services = ["GOOGL", "DIS"]
+consumer_discretionary = ["AMZN", "HD"]
+consumer_staples       = ["PG", "KO"]
+financials             = ["JPM", "BAC"]
+health_care            = ["JNJ", "UNH"]
+energy                 = ["XOM", "CVX"]
+industrials            = ["CAT", "HON"]
+utilities              = ["NEE"]
+materials              = ["FCX"]
+real_estate            = ["AMT"]
