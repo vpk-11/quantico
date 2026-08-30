@@ -1,0 +1,167 @@
+{
+  "communities": {
+    "0": [
+      "config_toml",
+      "data_research_store_db",
+      "pandas_3_0_5",
+      "pipeline_build",
+      "pipeline_query",
+      "pipeline_research_store",
+      "pipeline_research_store_rationale_1",
+      "pipeline_verify",
+      "yfinance_1_7_0"
+    ],
+    "1": [
+      "pipeline_research_store_basket",
+      "pipeline_research_store_build",
+      "pipeline_research_store_clean",
+      "pipeline_research_store_cleanreport",
+      "pipeline_research_store_cleanreport_summary",
+      "pipeline_research_store_rationale_103",
+      "pipeline_research_store_rationale_138",
+      "pipeline_research_store_rationale_192",
+      "pipeline_research_store_store"
+    ],
+    "2": [
+      "connection",
+      "path",
+      "pipeline_research_store_init_db",
+      "pipeline_research_store_load_config",
+      "pipeline_research_store_main",
+      "pipeline_research_store_query",
+      "pipeline_research_store_rationale_217",
+      "pipeline_research_store_verify"
+    ],
+    "3": [
+      "pipeline_test_research_store",
+      "pipeline_test_research_store_rationale_1",
+      "pipeline_test_research_store_test_basket_flattens_to_20",
+      "pipeline_test_research_store_test_detects_gap_but_does_not_fill",
+      "pipeline_test_research_store_test_drops_duplicate_dates_keep_last",
+      "pipeline_test_research_store_test_drops_nan_rows"
+    ],
+    "4": [
+      "pipeline_test_research_store_frame",
+      "pipeline_test_research_store_test_drops_nonpositive_prices",
+      "pipeline_test_research_store_test_flags_ohlc_inconsistency_without_dropping",
+      "pipeline_test_research_store_test_query_respects_date_bounds",
+      "pipeline_test_research_store_test_sorts_ascending",
+      "pipeline_test_research_store_test_sqlite_roundtrip_is_ordered_and_idempotent"
+    ],
+    "5": [
+      "pipeline_research_store_plus_one_day",
+      "pipeline_research_store_pull",
+      "pipeline_research_store_rationale_112"
+    ]
+  },
+  "cohesion": {
+    "0": 0.2222222222222222,
+    "1": 0.2777777777777778,
+    "2": 0.35714285714285715,
+    "3": 0.3333333333333333,
+    "4": 0.3333333333333333,
+    "5": 0.6666666666666666
+  },
+  "gods": [
+    {
+      "id": "pipeline_research_store_build",
+      "label": "build()",
+      "degree": 9
+    },
+    {
+      "id": "pipeline_test_research_store_frame",
+      "label": "_frame()",
+      "degree": 9
+    },
+    {
+      "id": "pipeline_research_store_query",
+      "label": "query()",
+      "degree": 5
+    },
+    {
+      "id": "pipeline_research_store_verify",
+      "label": "verify()",
+      "degree": 5
+    },
+    {
+      "id": "pipeline_research_store_main",
+      "label": "main()",
+      "degree": 5
+    },
+    {
+      "id": "pipeline_research_store_cleanreport",
+      "label": "CleanReport",
+      "degree": 4
+    },
+    {
+      "id": "pipeline_research_store_basket",
+      "label": "basket()",
+      "degree": 4
+    },
+    {
+      "id": "pipeline_research_store_pull",
+      "label": "pull()",
+      "degree": 4
+    },
+    {
+      "id": "pipeline_research_store_clean",
+      "label": "clean()",
+      "degree": 4
+    },
+    {
+      "id": "pipeline_research_store_init_db",
+      "label": "init_db()",
+      "degree": 4
+    }
+  ],
+  "surprises": [
+    {
+      "source": "test_query_respects_date_bounds()",
+      "target": "Path",
+      "source_files": [
+        "pipeline/test_research_store.py",
+        ""
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "note": "Bridges community 2 \u2192 community 4"
+    },
+    {
+      "source": "verify()",
+      "target": "basket()",
+      "source_files": [
+        "pipeline/research_store.py",
+        "pipeline/research_store.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 1 \u2192 community 2"
+    },
+    {
+      "source": "build()",
+      "target": "pull()",
+      "source_files": [
+        "pipeline/research_store.py",
+        "pipeline/research_store.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 5 \u2192 community 1"
+    },
+    {
+      "source": "test_detects_gap_but_does_not_fill()",
+      "target": "_frame()",
+      "source_files": [
+        "pipeline/test_research_store.py",
+        "pipeline/test_research_store.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 4 \u2192 community 3"
+    }
+  ],
+  "tokens": {
+    "input": 1313,
+    "output": 1319
+  }
+}
