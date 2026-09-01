@@ -22,15 +22,104 @@
   },
   "nodes": [
     {
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "pipeline/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "pipeline_readme",
+      "community": 5,
+      "norm_label": "readme.md"
+    },
+    {
+      "label": "pipeline/",
+      "file_type": "document",
+      "source_file": "pipeline/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "pipeline_readme_pipeline",
+      "community": 5,
+      "norm_label": "pipeline/"
+    },
+    {
+      "label": "Phase 1: research store",
+      "file_type": "document",
+      "source_file": "pipeline/README.md",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "pipeline_readme_phase_1_research_store",
+      "community": 5,
+      "norm_label": "phase 1: research store"
+    },
+    {
+      "label": "Setup",
+      "file_type": "document",
+      "source_file": "pipeline/README.md",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "pipeline_readme_setup",
+      "community": 5,
+      "norm_label": "setup"
+    },
+    {
+      "label": "Run",
+      "file_type": "document",
+      "source_file": "pipeline/README.md",
+      "source_location": "L21",
+      "_origin": "ast",
+      "id": "pipeline_readme_run",
+      "community": 5,
+      "norm_label": "run"
+    },
+    {
+      "label": "What it stores",
+      "file_type": "document",
+      "source_file": "pipeline/README.md",
+      "source_location": "L31",
+      "_origin": "ast",
+      "id": "pipeline_readme_what_it_stores",
+      "community": 5,
+      "norm_label": "what it stores"
+    },
+    {
+      "label": "Config",
+      "file_type": "document",
+      "source_file": "pipeline/README.md",
+      "source_location": "L43",
+      "_origin": "ast",
+      "id": "pipeline_readme_config",
+      "community": 5,
+      "norm_label": "config"
+    },
+    {
+      "label": "Undo",
+      "file_type": "document",
+      "source_file": "pipeline/README.md",
+      "source_location": "L48",
+      "_origin": "ast",
+      "id": "pipeline_readme_undo",
+      "community": 5,
+      "norm_label": "undo"
+    },
+    {
+      "label": "Tests",
+      "file_type": "document",
+      "source_file": "pipeline/README.md",
+      "source_location": "L53",
+      "_origin": "ast",
+      "id": "pipeline_readme_tests",
+      "community": 5,
+      "norm_label": "tests"
+    },
+    {
       "label": "research_store.py",
       "file_type": "code",
       "source_file": "pipeline/research_store.py",
       "source_location": "L1",
       "_origin": "ast",
-      "community": 0,
-      "norm_label": "research_store.py",
       "id": "pipeline_research_store",
-      "community_name": "Data Pipeline"
+      "community": 0,
+      "norm_label": "research_store.py"
     },
     {
       "label": "CleanReport",
@@ -38,10 +127,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L65",
       "_origin": "ast",
-      "community": 1,
-      "norm_label": "cleanreport",
       "id": "pipeline_research_store_cleanreport",
-      "community_name": "Data Cleaning"
+      "community": 1,
+      "norm_label": "cleanreport"
     },
     {
       "label": ".summary()",
@@ -49,10 +137,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L78",
       "_origin": "ast",
-      "community": 1,
-      "norm_label": ".summary()",
       "id": "pipeline_research_store_cleanreport_summary",
-      "community_name": "Data Cleaning"
+      "community": 1,
+      "norm_label": ".summary()"
     },
     {
       "label": "load_config()",
@@ -60,22 +147,20 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L97",
       "_origin": "ast",
-      "community": 2,
-      "norm_label": "load_config()",
       "id": "pipeline_research_store_load_config",
-      "community_name": "Database Query"
+      "community": 2,
+      "norm_label": "load_config()"
     },
     {
       "label": "Path",
       "file_type": "code",
       "source_file": "",
       "source_location": "",
-      "origin_file": "/Users/vpk/Desktop/Development/arl/pipeline/research_store.py",
+      "origin_file": "/Users/vpk/Desktop/Development/quantico/pipeline/research_store.py",
       "_origin": "ast",
-      "community": 2,
-      "norm_label": "path",
       "id": "path",
-      "community_name": "Database Query"
+      "community": 6,
+      "norm_label": "path"
     },
     {
       "label": "basket()",
@@ -83,10 +168,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L102",
       "_origin": "ast",
-      "community": 1,
-      "norm_label": "basket()",
       "id": "pipeline_research_store_basket",
-      "community_name": "Data Cleaning"
+      "community": 7,
+      "norm_label": "basket()"
     },
     {
       "label": "pull()",
@@ -94,10 +178,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L111",
       "_origin": "ast",
-      "community": 5,
-      "norm_label": "pull()",
       "id": "pipeline_research_store_pull",
-      "community_name": "Data Fetch"
+      "community": 1,
+      "norm_label": "pull()"
     },
     {
       "label": "clean()",
@@ -105,10 +188,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L137",
       "_origin": "ast",
-      "community": 1,
-      "norm_label": "clean()",
       "id": "pipeline_research_store_clean",
-      "community_name": "Data Cleaning"
+      "community": 1,
+      "norm_label": "clean()"
     },
     {
       "label": "init_db()",
@@ -116,22 +198,20 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L182",
       "_origin": "ast",
-      "community": 2,
-      "norm_label": "init_db()",
       "id": "pipeline_research_store_init_db",
-      "community_name": "Database Query"
+      "community": 6,
+      "norm_label": "init_db()"
     },
     {
       "label": "Connection",
       "file_type": "code",
       "source_file": "",
       "source_location": "",
-      "origin_file": "/Users/vpk/Desktop/Development/arl/pipeline/research_store.py",
+      "origin_file": "/Users/vpk/Desktop/Development/quantico/pipeline/research_store.py",
       "_origin": "ast",
-      "community": 2,
-      "norm_label": "connection",
       "id": "connection",
-      "community_name": "Database Query"
+      "community": 6,
+      "norm_label": "connection"
     },
     {
       "label": "store()",
@@ -139,10 +219,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L191",
       "_origin": "ast",
-      "community": 1,
-      "norm_label": "store()",
       "id": "pipeline_research_store_store",
-      "community_name": "Data Cleaning"
+      "community": 6,
+      "norm_label": "store()"
     },
     {
       "label": "query()",
@@ -150,10 +229,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L216",
       "_origin": "ast",
-      "community": 2,
-      "norm_label": "query()",
       "id": "pipeline_research_store_query",
-      "community_name": "Database Query"
+      "community": 2,
+      "norm_label": "query()"
     },
     {
       "label": "_plus_one_day()",
@@ -161,10 +239,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L228",
       "_origin": "ast",
-      "community": 5,
-      "norm_label": "_plus_one_day()",
       "id": "pipeline_research_store_plus_one_day",
-      "community_name": "Data Fetch"
+      "community": 1,
+      "norm_label": "_plus_one_day()"
     },
     {
       "label": "build()",
@@ -172,10 +249,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L237",
       "_origin": "ast",
-      "community": 1,
-      "norm_label": "build()",
       "id": "pipeline_research_store_build",
-      "community_name": "Data Cleaning"
+      "community": 1,
+      "norm_label": "build()"
     },
     {
       "label": "verify()",
@@ -183,10 +259,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L280",
       "_origin": "ast",
-      "community": 2,
-      "norm_label": "verify()",
       "id": "pipeline_research_store_verify",
-      "community_name": "Database Query"
+      "community": 7,
+      "norm_label": "verify()"
     },
     {
       "label": "main()",
@@ -194,21 +269,19 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L330",
       "_origin": "ast",
-      "community": 2,
-      "norm_label": "main()",
       "id": "pipeline_research_store_main",
-      "community_name": "Database Query"
+      "community": 2,
+      "norm_label": "main()"
     },
     {
-      "label": "Research store: pull, clean, and store daily OHLCV for the ARL basket.  Phase 1",
+      "label": "Research store: pull, clean, and store daily OHLCV for the Quantico basket.  Pha",
       "file_type": "rationale",
       "source_file": "pipeline/research_store.py",
       "source_location": "L1",
       "_origin": "ast",
-      "community": 0,
-      "norm_label": "research store: pull, clean, and store daily ohlcv for the arl basket.  phase 1",
       "id": "pipeline_research_store_rationale_1",
-      "community_name": "Data Pipeline"
+      "community": 0,
+      "norm_label": "research store: pull, clean, and store daily ohlcv for the quantico basket.  pha"
     },
     {
       "label": "Flatten config basket into ordered (ticker, sector) pairs.",
@@ -216,10 +289,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L103",
       "_origin": "ast",
-      "community": 1,
-      "norm_label": "flatten config basket into ordered (ticker, sector) pairs.",
       "id": "pipeline_research_store_rationale_103",
-      "community_name": "Data Cleaning"
+      "community": 7,
+      "norm_label": "flatten config basket into ordered (ticker, sector) pairs."
     },
     {
       "label": "Fetch daily OHLCV for one ticker. Raises if the response is empty.      `end` is",
@@ -227,10 +299,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L112",
       "_origin": "ast",
-      "community": 5,
-      "norm_label": "fetch daily ohlcv for one ticker. raises if the response is empty.      `end` is",
       "id": "pipeline_research_store_rationale_112",
-      "community_name": "Data Fetch"
+      "community": 1,
+      "norm_label": "fetch daily ohlcv for one ticker. raises if the response is empty.      `end` is"
     },
     {
       "label": "Drop unusable rows, flag suspicious ones, detect gaps. Never fills.",
@@ -238,10 +309,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L138",
       "_origin": "ast",
-      "community": 1,
-      "norm_label": "drop unusable rows, flag suspicious ones, detect gaps. never fills.",
       "id": "pipeline_research_store_rationale_138",
-      "community_name": "Data Cleaning"
+      "community": 1,
+      "norm_label": "drop unusable rows, flag suspicious ones, detect gaps. never fills."
     },
     {
       "label": "Idempotent write: re-running build replaces existing rows, never dupes.",
@@ -249,10 +319,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L192",
       "_origin": "ast",
-      "community": 1,
-      "norm_label": "idempotent write: re-running build replaces existing rows, never dupes.",
       "id": "pipeline_research_store_rationale_192",
-      "community_name": "Data Cleaning"
+      "community": 6,
+      "norm_label": "idempotent write: re-running build replaces existing rows, never dupes."
     },
     {
       "label": "Return rows for ticker in [start, end] inclusive, ordered by date ascending.",
@@ -260,10 +329,9 @@
       "source_file": "pipeline/research_store.py",
       "source_location": "L217",
       "_origin": "ast",
-      "community": 2,
-      "norm_label": "return rows for ticker in [start, end] inclusive, ordered by date ascending.",
       "id": "pipeline_research_store_rationale_217",
-      "community_name": "Database Query"
+      "community": 2,
+      "norm_label": "return rows for ticker in [start, end] inclusive, ordered by date ascending."
     },
     {
       "label": "test_research_store.py",
@@ -273,8 +341,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": "test_research_store.py",
-      "id": "pipeline_test_research_store",
-      "community_name": "Test Suite"
+      "community_name": "Test Suite",
+      "id": "pipeline_test_research_store"
     },
     {
       "label": "_frame()",
@@ -284,8 +352,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "_frame()",
-      "id": "pipeline_test_research_store_frame",
-      "community_name": "Test Framework"
+      "community_name": "Test Framework",
+      "id": "pipeline_test_research_store_frame"
     },
     {
       "label": "test_drops_nan_rows()",
@@ -295,8 +363,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": "test_drops_nan_rows()",
-      "id": "pipeline_test_research_store_test_drops_nan_rows",
-      "community_name": "Test Suite"
+      "community_name": "Test Suite",
+      "id": "pipeline_test_research_store_test_drops_nan_rows"
     },
     {
       "label": "test_drops_duplicate_dates_keep_last()",
@@ -306,8 +374,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": "test_drops_duplicate_dates_keep_last()",
-      "id": "pipeline_test_research_store_test_drops_duplicate_dates_keep_last",
-      "community_name": "Test Suite"
+      "community_name": "Test Suite",
+      "id": "pipeline_test_research_store_test_drops_duplicate_dates_keep_last"
     },
     {
       "label": "test_drops_nonpositive_prices()",
@@ -317,8 +385,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "test_drops_nonpositive_prices()",
-      "id": "pipeline_test_research_store_test_drops_nonpositive_prices",
-      "community_name": "Test Framework"
+      "community_name": "Test Framework",
+      "id": "pipeline_test_research_store_test_drops_nonpositive_prices"
     },
     {
       "label": "test_flags_ohlc_inconsistency_without_dropping()",
@@ -328,8 +396,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "test_flags_ohlc_inconsistency_without_dropping()",
-      "id": "pipeline_test_research_store_test_flags_ohlc_inconsistency_without_dropping",
-      "community_name": "Test Framework"
+      "community_name": "Test Framework",
+      "id": "pipeline_test_research_store_test_flags_ohlc_inconsistency_without_dropping"
     },
     {
       "label": "test_detects_gap_but_does_not_fill()",
@@ -339,8 +407,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": "test_detects_gap_but_does_not_fill()",
-      "id": "pipeline_test_research_store_test_detects_gap_but_does_not_fill",
-      "community_name": "Test Suite"
+      "community_name": "Test Suite",
+      "id": "pipeline_test_research_store_test_detects_gap_but_does_not_fill"
     },
     {
       "label": "test_sorts_ascending()",
@@ -350,8 +418,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "test_sorts_ascending()",
-      "id": "pipeline_test_research_store_test_sorts_ascending",
-      "community_name": "Test Framework"
+      "community_name": "Test Framework",
+      "id": "pipeline_test_research_store_test_sorts_ascending"
     },
     {
       "label": "test_sqlite_roundtrip_is_ordered_and_idempotent()",
@@ -361,8 +429,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "test_sqlite_roundtrip_is_ordered_and_idempotent()",
-      "id": "pipeline_test_research_store_test_sqlite_roundtrip_is_ordered_and_idempotent",
-      "community_name": "Test Framework"
+      "community_name": "Test Framework",
+      "id": "pipeline_test_research_store_test_sqlite_roundtrip_is_ordered_and_idempotent"
     },
     {
       "label": "test_query_respects_date_bounds()",
@@ -372,8 +440,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "test_query_respects_date_bounds()",
-      "id": "pipeline_test_research_store_test_query_respects_date_bounds",
-      "community_name": "Test Framework"
+      "community_name": "Test Framework",
+      "id": "pipeline_test_research_store_test_query_respects_date_bounds"
     },
     {
       "label": "test_basket_flattens_to_20()",
@@ -383,8 +451,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": "test_basket_flattens_to_20()",
-      "id": "pipeline_test_research_store_test_basket_flattens_to_20",
-      "community_name": "Test Suite"
+      "community_name": "Test Suite",
+      "id": "pipeline_test_research_store_test_basket_flattens_to_20"
     },
     {
       "label": "Offline checks for research_store.clean() and the sqlite round-trip.  No network",
@@ -394,50 +462,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": "offline checks for research_store.clean() and the sqlite round-trip.  no network",
-      "id": "pipeline_test_research_store_rationale_1",
-      "community_name": "Test Suite"
-    },
-    {
-      "label": "verify",
-      "file_type": "code",
-      "source_file": "pipeline/research_store.py",
-      "source_location": null,
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null,
-      "community": 0,
-      "norm_label": "verify",
-      "id": "pipeline_verify",
-      "community_name": "Data Pipeline"
-    },
-    {
-      "label": "build",
-      "file_type": "code",
-      "source_file": "pipeline/research_store.py",
-      "source_location": null,
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null,
-      "community": 0,
-      "norm_label": "build",
-      "id": "pipeline_build",
-      "community_name": "Data Pipeline"
-    },
-    {
-      "label": "query",
-      "file_type": "code",
-      "source_file": "pipeline/research_store.py",
-      "source_location": null,
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null,
-      "community": 0,
-      "norm_label": "query",
-      "id": "pipeline_query",
-      "community_name": "Data Pipeline"
+      "community_name": "Test Suite",
+      "id": "pipeline_test_research_store_rationale_1"
     },
     {
       "label": "config.toml",
@@ -450,22 +476,8 @@
       "contributor": null,
       "community": 0,
       "norm_label": "config.toml",
-      "id": "config_toml",
-      "community_name": "Data Pipeline"
-    },
-    {
-      "label": "data/research_store.db",
-      "file_type": "code",
-      "source_file": "pipeline/research_store.py",
-      "source_location": null,
-      "source_url": null,
-      "captured_at": null,
-      "author": null,
-      "contributor": null,
-      "community": 0,
-      "norm_label": "data/research_store.db",
-      "id": "data_research_store_db",
-      "community_name": "Data Pipeline"
+      "community_name": "Data Pipeline",
+      "id": "config_toml"
     },
     {
       "label": "yfinance==1.7.0",
@@ -478,8 +490,8 @@
       "contributor": null,
       "community": 0,
       "norm_label": "yfinance==1.7.0",
-      "id": "yfinance_1_7_0",
-      "community_name": "Data Pipeline"
+      "community_name": "Data Pipeline",
+      "id": "yfinance_1_7_0"
     },
     {
       "label": "pandas==3.0.5",
@@ -492,11 +504,91 @@
       "contributor": null,
       "community": 0,
       "norm_label": "pandas==3.0.5",
-      "id": "pandas_3_0_5",
-      "community_name": "Data Pipeline"
+      "community_name": "Data Pipeline",
+      "id": "pandas_3_0_5"
     }
   ],
   "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pipeline/README.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "pipeline_readme",
+      "target": "pipeline_readme_pipeline",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pipeline/README.md",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "pipeline_readme_pipeline",
+      "target": "pipeline_readme_phase_1_research_store",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pipeline/README.md",
+      "source_location": "L43",
+      "weight": 1.0,
+      "source": "pipeline_readme_phase_1_research_store",
+      "target": "pipeline_readme_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pipeline/README.md",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "pipeline_readme_phase_1_research_store",
+      "target": "pipeline_readme_run",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pipeline/README.md",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "pipeline_readme_phase_1_research_store",
+      "target": "pipeline_readme_setup",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pipeline/README.md",
+      "source_location": "L53",
+      "weight": 1.0,
+      "source": "pipeline_readme_phase_1_research_store",
+      "target": "pipeline_readme_tests",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pipeline/README.md",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "pipeline_readme_phase_1_research_store",
+      "target": "pipeline_readme_undo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "pipeline/README.md",
+      "source_location": "L31",
+      "weight": 1.0,
+      "source": "pipeline_readme_phase_1_research_store",
+      "target": "pipeline_readme_what_it_stores",
+      "confidence_score": 1.0
+    },
     {
       "relation": "imports",
       "confidence": "EXTRACTED",
@@ -516,36 +608,6 @@
       "weight": 1.0,
       "source": "pipeline_research_store",
       "target": "config_toml"
-    },
-    {
-      "relation": "writes_to",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "pipeline/research_store.py",
-      "source_location": null,
-      "weight": 1.0,
-      "source": "pipeline_research_store",
-      "target": "data_research_store_db"
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "pipeline/research_store.py",
-      "source_location": null,
-      "weight": 1.0,
-      "source": "pipeline_research_store",
-      "target": "pipeline_build"
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "pipeline/research_store.py",
-      "source_location": null,
-      "weight": 1.0,
-      "source": "pipeline_research_store",
-      "target": "pipeline_query"
     },
     {
       "relation": "contains",
@@ -666,16 +728,6 @@
       "confidence_score": 1.0,
       "source": "pipeline_research_store",
       "target": "pipeline_research_store_verify"
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "pipeline/research_store.py",
-      "source_location": null,
-      "weight": 1.0,
-      "source": "pipeline_research_store",
-      "target": "pipeline_verify"
     },
     {
       "relation": "rationale_for",
@@ -1226,5 +1278,5 @@
       "source_location": null
     }
   ],
-  "built_at_commit": "4dbfafc23f1bc2d269f4bf69752a43e1b971cd12"
+  "built_at_commit": "ec10b4342e8916382aabc63e2040d0c6e66c538a"
 }

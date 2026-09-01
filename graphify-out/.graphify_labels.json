@@ -1,1 +1,10 @@
-{"0": "Data Pipeline", "1": "Data Cleaning", "2": "Database Query", "3": "Test Suite", "4": "Test Framework", "5": "Data Fetch"}
+{
+  "0": "Data Pipeline",
+  "1": "Data Cleaning",
+  "2": "Database Query",
+  "3": "Test Suite",
+  "4": "Test Framework",
+  "5": "Data Fetch",
+  "6": "Community 6",
+  "7": "Community 7"
+}
