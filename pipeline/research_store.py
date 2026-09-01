@@ -1,4 +1,4 @@
-"""Research store: pull, clean, and store daily OHLCV for the ARL basket.
+"""Research store: pull, clean, and store daily OHLCV for the Quantico basket.
 
 Phase 1 scope only. Raw-data storage. No features, no model.
 
@@ -328,7 +328,7 @@ def verify(cfg: dict) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="ARL research store (Phase 1)")
+    parser = argparse.ArgumentParser(description="Quantico research store (Phase 1)")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("build", help="pull + clean + store the whole basket")
     q = sub.add_parser("query", help="print stored rows for a ticker + date range")

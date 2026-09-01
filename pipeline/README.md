@@ -1,9 +1,9 @@
 # pipeline/
 
-Python side of ARL: the research-to-paper-trading pipeline. `simulator/` (C++)
+Python side of Quantico: the research-to-paper-trading pipeline. `simulator/` (C++)
 is the separate execution-simulator component.
 
-Folder name is a working placeholder, same as the repo name.
+Folder name is a working placeholder, same as the project name.
 
 ## Phase 1: research store
 
@@ -14,7 +14,7 @@ Raw-data storage only. No features, no model.
 ### Setup
 
 ```
-conda activate arl                 # env: python 3.12, created for this project
+conda activate quantico            # env: python 3.12, created for this project
 pip install -r requirements.txt
 ```
 
