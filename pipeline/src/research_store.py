@@ -16,10 +16,10 @@ Open/High/Low/Close columns are the raw (unadjusted) prices as traded, and
 'Adj Close' is Yahoo's split- and dividend-adjusted close. Both are stored.
 Downstream phases choose which to use; nothing is adjusted here.
 
-Usage:
-    python research_store.py build                  # pull + clean + store everything
-    python research_store.py query AAPL 2020-01-01 2020-03-31
-    python research_store.py verify                 # coverage + spot-check report
+Usage (run from pipeline/):
+    python src/research_store.py build              # pull + clean + store everything
+    python src/research_store.py query AAPL 2020-01-01 2020-03-31
+    python src/research_store.py verify             # coverage + spot-check report
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from pathlib import Path
 
 import yfinance as yf
 
-HERE = Path(__file__).resolve().parent
+_ROOT = Path(__file__).resolve().parents[1]  # pipeline/ (holds config.toml + data/)
 
 # yfinance (auto_adjust=False, multi_level_index=False) column -> our column
 _COLUMN_MAP = {
@@ -94,7 +94,7 @@ class CleanReport:
         return "  ".join(parts)
 
 
-def load_config(path: str | Path = HERE / "config.toml") -> dict:
+def load_config(path: str | Path = _ROOT / "config.toml") -> dict:
     with open(path, "rb") as fh:
         return tomllib.load(fh)
 
@@ -238,7 +238,7 @@ def build(cfg: dict) -> list[CleanReport]:
     start = cfg["data"]["start_date"]
     end = cfg["data"]["end_date"]
     max_gap = int(cfg["data"].get("max_gap_days", 5))
-    db_path = HERE / cfg["data"]["db_path"]
+    db_path = _ROOT / cfg["data"]["db_path"]
 
     conn = init_db(db_path)
     reports: list[CleanReport] = []
@@ -278,7 +278,7 @@ _SPOT_CHECKS = [
 
 
 def verify(cfg: dict) -> bool:
-    db_path = HERE / cfg["data"]["db_path"]
+    db_path = _ROOT / cfg["data"]["db_path"]
     if not Path(db_path).exists():
         print(f"no DB at {db_path}; run `build` first")
         return False
@@ -345,7 +345,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "verify":
         return 0 if verify(cfg) else 1
     if args.cmd == "query":
-        conn = sqlite3.connect(HERE / cfg["data"]["db_path"])
+        conn = sqlite3.connect(_ROOT / cfg["data"]["db_path"])
         try:
             rows = query(conn, args.ticker.upper(), args.start, args.end)
         finally:
