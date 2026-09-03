@@ -7,6 +7,12 @@ end_date   = "2025-12-31"    # last calendar day requested (exclusive upper boun
 db_path    = "data/research_store.db"  # relative to this file's directory
 max_gap_days = 5             # consecutive trading rows farther apart than this are flagged, not filled
 
+# Phase 2 feature engineering. Windows in trading days. Changing a window is
+# an edit here, never in features.py.
+[features]
+momentum_windows_days      = [21, 63, 126, 252]  # ~1mo / 3mo / 6mo / 12mo trailing return
+mean_reversion_window_days = 20                   # also drives the volatility and liquidity windows
+
 # 20 large-cap US equities, one entry per GICS sector group, all with full
 # daily history from Jan 2007. Post-2007 IPOs (META, TSLA, V) are deliberately
 # excluded so every series spans the full range. Survivorship bias is a

@@ -1,16 +1,18 @@
 """Offline checks for research_store.clean() and the sqlite round-trip.
 
-No network. Run: python test_research_store.py
+No network. Run: python tests/test_research_store.py  (or: pytest)
 """
 
 import sqlite3
+import sys
 import tempfile
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-import research_store as rs
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import research_store as rs  # noqa: E402
 
 
 def _frame(dates, **cols):
