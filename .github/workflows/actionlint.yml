@@ -1,0 +1,16 @@
+name: Actionlint
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    uses: vpk-11/workflows/.github/workflows/actionlint.yml@v1

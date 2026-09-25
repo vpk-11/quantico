@@ -1,0 +1,23 @@
+name: Version Bump
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      level:
+        type: choice
+        default: auto
+        options: [auto, patch, minor, major]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  bump:
+    uses: vpk-11/workflows/.github/workflows/version-bump.yml@v1
+    with:
+      level: ${{ inputs.level || 'auto' }}
+      generated: '^graphify-out/'
+      nonsource: '(\.md$|^pipeline/tests/|^\.github/|^LICENSE$)'
+      stamp: 'pyproject.toml'
