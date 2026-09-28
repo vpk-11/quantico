@@ -46,10 +46,5 @@ compile_commands.json
 # Research store DB
 pipeline/data/*.db
 
-# graphify: machine-local / regenerated on rebuild
-graphify-out/manifest.json
-graphify-out/cost.json
-graphify-out/.graphify_root
-graphify-out/.graphify_python
-graphify-out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
-graphify-out/cache/
+# Graphify output
+graphify-out/
