@@ -55,9 +55,20 @@ impact_coeff_bps     = 10.0     # assumed, uncalibrated; bps per sqrt(fraction o
 participation_cap    = 0.10     # max share of a slice's volume one order may take; excess carries forward
 latency_slices       = 1        # decision-to-market delay, in slices
 cost_multiplier      = 1.0      # scales half_spread_bps and impact_coeff_bps only, not fee_bps
-capital              = 25000000 # fixed notional, no compounding, so orders are identical across strategies
+capital              = 25000000 # base-cell fixed notional, no compounding; Phase 5 sweeps this
 top_n                = 5        # long-only: equal weight in the top_n predictions (no short selling)
-rebalance_days       = 5        # trading days between rebalances (the prediction horizon)
+# rebalance_days is not a config key: it is cfg["phase3"]["target_horizon_days"] everywhere,
+# never duplicated, so the two cannot drift apart.
+
+# Phase 5 robustness grid: base portfolio rules above, swept across every combination below.
+# noisy_volume is not in intraday_variants: it uses [phase4] intraday_noise_seeds (5 paths),
+# reported as mean and range rather than as its own grid row.
+[phase5]
+intraday_variants = ["base", "swap_extremes", "flat_volume"]
+cost_multipliers  = [0.5, 1.0, 2.0]
+capital_levels    = [25000000, 250000000, 2500000000]
+null_draws        = 200   # random top-5 null, seeded draws
+null_seed         = 11
 
 # Phase 6 paper loop. Execution strategy chosen mechanically from the Phase 5 report
 # (lowest mean total cost in bps), then frozen.
