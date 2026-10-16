@@ -14,11 +14,32 @@ pipeline/
   src/
     research_store.py  Phase 1: pull / clean / store / query daily OHLCV
     features.py        Phase 2: momentum, mean reversion, volatility, liquidity
+    walkforward.py     Phase 3: target, preprocessor, folds (purge gap), runner
+    models.py          Phase 3: model interface + registry (ridge)
+    evaluate.py        Phase 3: IC, Newey-West, gates G1 to G5, extras
+    controls.py        Phase 3: shuffle and planted-signal controls
+    integrity.py       Phase 3: integrity tests I1 to I6
+    trials.py          Phase 3: trial registry + predictions storage
+    report.py          Phase 3: report renderer
+    baseline.py        Phase 3: CLI run / verify / report
+    escalation.py      Phase 3.5: random forest and 10-day horizon comparisons, adoption rule
+    execution.py       Phase 4: synthetic intraday slices, Python reference fills, simulator subprocess wrapper
+    backtest.py        Phase 5: immediate / TWAP / VWAP comparison on one held-constant signal
+    paper.py           Phase 6/7: forward paper loop and performance tracking
+  scripts/
+    run_phase35.sh     Phase 3.5 run + verify (hours, random forest nulls)
+    daily.sh           daily paper step (cron-ready)
   tests/
     test_research_store.py   offline: clean() logic + sqlite round-trip
     test_features.py          offline: feature formulas + no-lookahead + round-trip
+    test_phase3.py            offline: Phase 3 integrity tests on synthetic data
+    test_phase35.py           offline: weights, horizon-10, random forest integrity, adoption rule
+    test_phase4.py            C++ vs Python reference bit-exact parity (needs `make -C simulator`)
+    test_phase6.py            offline: fill accounting, target selection, no-lookahead in predict
+  reports/
+    phase3_report.md, phase3_5_report.md, phase5_report.md, phase7_report.md   generated (tracked)
   data/
-    research_store.db  SQLite store (git-ignored, holds daily_bars + features)
+    research_store.db  SQLite store (git-ignored, holds daily_bars + features + trials + predictions)
 ```
 
 Later phases (model + walk-forward, paper loop, tracking) add modules under
@@ -43,6 +64,18 @@ python src/research_store.py query AAPL 2020-01-01 2020-03-31
 python src/features.py build                           # Phase 2: compute + store all features
 python src/features.py verify                           # Phase 2: coverage + no-lookahead + spot checks
 python src/features.py show AAPL 2020-03-20 2020-03-25
+
+python src/baseline.py run                             # Phase 3: walk-forward, gates, store predictions, write report
+python src/baseline.py verify                          # Phase 3: re-derive and check stored output
+python src/baseline.py report                          # Phase 3: regenerate reports/phase3_report.md
+
+bash scripts/run_phase35.sh                            # Phase 3.5: random forest + 10-day horizon (hours)
+
+make -C ../simulator                                   # Phase 4: build the C++ simulator
+python src/backtest.py run                             # Phase 5: execution comparison -> reports/phase5_report.md
+python src/backtest.py bench                           # Phase 4: C++ vs Python reference timing
+python src/paper.py run                                # Phase 6/7: pull bars, process new days, write reports/phase7_report.md
+bash scripts/daily.sh                                  # the same, as a cron job
 ```
 
 `features.py build` needs `daily_bars` to exist already (run `research_store.py
@@ -98,6 +131,15 @@ all 20 tickers (shared NYSE calendar from 2007-01-03):
 `config.toml` holds the date range, the basket, `max_gap_days`, and the Phase 2
 feature windows. No values are hardcoded in `src/`.
 
+## Phase 3: baseline model + walk-forward
+
+Pooled ridge regression on the 7 features predicting the 5-trading-day forward
+return, scored out-of-sample over 10 expanding walk-forward folds (test years
+2016 to 2025) against five pre-registered gates in `config.toml [phase3]`.
+Verdict at k=1: FAIL, "no validated edge" (mean IC 0.0062, Newey-West t 0.53).
+All six integrity tests pass. Predictions are stored in `predictions` and the
+full result is in `reports/phase3_report.md`.
+
 ## Undo
 
 Delete `data/research_store.db` and rebuild:
@@ -109,8 +151,9 @@ recreates the `features` table each run, so a change to
 ## Tests
 
 ```
-python tests/test_research_store.py     # or: pytest
+python tests/test_research_store.py     # or: python -m pytest tests
 python tests/test_features.py
+python tests/test_phase3.py
 ```
 
 No framework required; each file has a plain `assert`-based runner. `pytest`
