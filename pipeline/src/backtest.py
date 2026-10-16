@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import sqlite3
+import statistics
 import sys
 import time
 from pathlib import Path
@@ -106,7 +107,7 @@ def nav_stats(nav: pd.Series) -> dict:
 
 
 def run(cfg: dict) -> int:
-    p = cfg["phase4"]
+    p = ex.cost_params(cfg["phase4"])
     conn = sqlite3.connect(_ROOT / cfg["data"]["db_path"])
     try:
         bars = load_bars(conn)
@@ -161,23 +162,55 @@ def render(rows: dict, free: dict, ew: dict, p: dict, n_preds: int, d0: str, d1:
     return "\n".join(L)
 
 
-def bench(cfg: dict, n: int = 20000) -> int:
-    p = cfg["phase4"]
-    rng = np.random.default_rng(1)
+BENCH_PATH = _ROOT / "reports" / "phase4_benchmark.md"
+
+
+def _bench_orders(p: dict, n: int, seed: int) -> list[dict]:
+    rng = np.random.default_rng(seed)
     orders = []
     for i in range(n):
         o = float(rng.uniform(20, 400))
         px, vol = ex.make_slices(o, o * 1.02, o * 0.98, o * 1.01, int(rng.integers(1_000_000, 50_000_000)), p["slices"])
         orders.append({"id": i, "side": int(rng.choice([-1, 1])), "strategy": int(rng.integers(0, 3)),
                        "qty": int(rng.integers(1, 2_000_000)), "prices": px, "vols": vol})
-    t = time.perf_counter()
-    ex.simulate(orders, p)
-    cpp = time.perf_counter() - t
-    t = time.perf_counter()
-    for o in orders:
-        ex.reference_fill(o["side"], o["strategy"], o["qty"], o["prices"], o["vols"], p)
-    py = time.perf_counter() - t
-    print(f"{n} orders: C++ subprocess incl. startup + csv io {cpp:.3f}s, Python reference loop {py:.3f}s, {py / cpp:.1f}x")
+    return orders
+
+
+def bench(cfg: dict) -> int:
+    """Times the C++ subprocess (incl. startup + CSV I/O) against the Python reference loop at
+    2k, 20k, and 200k orders, 3 repeats each, and writes reports/phase4_benchmark.md. No speed
+    claim is made anywhere except from this table.
+    """
+    p = ex.cost_params(cfg["phase4"])
+    rows = []
+    for n in (2_000, 20_000, 200_000):
+        cpp_times, py_times = [], []
+        for rep in range(3):
+            orders = _bench_orders(p, n, seed=1000 * n + rep)
+            t = time.perf_counter()
+            ex.simulate(orders, p)
+            cpp_times.append(time.perf_counter() - t)
+            t = time.perf_counter()
+            for o in orders:
+                ex.reference_fill(o["side"], o["strategy"], o["qty"], o["prices"], o["vols"], p)
+            py_times.append(time.perf_counter() - t)
+        cpp_med, py_med = statistics.median(cpp_times), statistics.median(py_times)
+        cpp_spread, py_spread = max(cpp_times) - min(cpp_times), max(py_times) - min(py_times)
+        rows.append((n, cpp_med, cpp_spread, py_med, py_spread))
+        print(f"{n} orders: C++ median {cpp_med:.3f}s (spread {cpp_spread:.3f}), "
+              f"Python median {py_med:.3f}s (spread {py_spread:.3f})", flush=True)
+    L = ["# Phase 4 benchmark: C++ simulator vs Python reference", "",
+         "3 repeats per order count, median and spread (max minus min) across repeats, in seconds. "
+         "C++ timing includes subprocess startup and CSV I/O; Python is an in-process loop.", "",
+         "| orders | C++ median (s) | C++ spread (s) | Python median (s) | Python spread (s) | faster |",
+         "|---|---|---|---|---|---|"]
+    for n, cm, cs, pm, ps in rows:
+        L.append(f"| {n:,} | {cm:.3f} | {cs:.3f} | {pm:.3f} | {ps:.3f} | {'C++' if cm < pm else 'Python'} |")
+    L += ["", "No speed claim is made beyond this table. The case for the C++ simulator is an "
+          "independent, bit-exact-parity-checked implementation (see test_phase4.py), not raw speed.", ""]
+    BENCH_PATH.parent.mkdir(exist_ok=True)
+    BENCH_PATH.write_text("\n".join(L))
+    print(f"report: {BENCH_PATH}")
     return 0
 
 

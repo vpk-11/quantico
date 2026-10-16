@@ -107,7 +107,7 @@ def predict(conn: sqlite3.Connection, cfg: dict, d: str) -> pd.Series:
 
 
 def process_day(conn: sqlite3.Connection, cfg: dict, d: str, i: int) -> None:
-    p, p6 = cfg["phase4"], cfg["phase6"]
+    p, p6 = ex.cost_params(cfg["phase4"]), cfg["phase6"]
     bars_d = pd.read_sql_query("SELECT * FROM live_bars WHERE date = ?", conn, index_col="ticker", params=(d,))
     pos, cash = positions(conn, p["capital"])
     pending = conn.execute("SELECT ticker, shares FROM paper_targets WHERE executed = 0 AND decided_on < ?", (d,)).fetchall()
@@ -148,7 +148,7 @@ def run(cfg: dict) -> int:
 
 
 def report(cfg: dict) -> int:
-    p, conn = cfg["phase4"], sqlite3.connect(_ROOT / cfg["data"]["db_path"])
+    p, conn = ex.cost_params(cfg["phase4"]), sqlite3.connect(_ROOT / cfg["data"]["db_path"])
     try:
         nav = pd.read_sql_query("SELECT date, nav FROM paper_nav ORDER BY date", conn, index_col="date")["nav"]
         fills = pd.read_sql_query("SELECT * FROM paper_fills", conn)
