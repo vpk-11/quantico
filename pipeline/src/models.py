@@ -38,7 +38,7 @@ class RandomForest:
     def __init__(self, n_estimators: int, max_depth: int, min_samples_leaf: int, max_features: float, seed: int):
         self._m = _SkForest(
             n_estimators=n_estimators, max_depth=max_depth, min_samples_leaf=min_samples_leaf,
-            max_features=max_features, random_state=seed, n_jobs=4,
+            max_features=max_features, random_state=seed, n_jobs=6,
         )
 
     def fit(self, X, y, sample_weight=None):
