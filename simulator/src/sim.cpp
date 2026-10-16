@@ -2,7 +2,7 @@
 //
 // One order per input line: id,side,strategy,qty,p_0..p_{N-1},v_0..v_{N-1}
 //   side: 1 buy, -1 sell. strategy: 0 immediate, 1 TWAP, 2 VWAP. prices double, volumes integer.
-// One result per line: id,filled,notional,fees  (%.17g, so Python can compare bit for bit).
+// One result per line: id,filled,notional,fees,spread_cost,impact_cost,raw_notional (%.17g, bit-exact with Python).
 //
 // Child orders are scheduled per slice, shifted by `latency` slices, capped at max_part of the
 // slice volume (the remainder carries to the next slice), and priced at the slice price moved
@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
         const std::vector<i64> sched =
             schedule(strategy, qty, std::vector<i64>(vol.begin() + std::min(latency, n - 1), vol.end()));
         i64 carry = 0, filled = 0;
-        double notional = 0.0, fees = 0.0;
+        double notional = 0.0, fees = 0.0, spread_cost = 0.0, impact_cost = 0.0, raw_notional = 0.0;
         for (int j = 0; j < n; ++j) {
             const i64 want = (j >= latency && j - latency < static_cast<int>(sched.size()) ? sched[j - latency] : 0) + carry;
             const i64 cap = static_cast<i64>(std::floor(max_part * static_cast<double>(vol[j])));
@@ -89,14 +89,20 @@ int main(int argc, char** argv) {
             carry = want - fill;
             if (fill <= 0) continue;
             const double part = static_cast<double>(fill) / static_cast<double>(vol[j]);
-            const double slip = spread + impact * std::sqrt(part);
+            const double spread_component = spread;
+            const double impact_component = impact * std::sqrt(part);
+            const double slip = spread_component + impact_component;
             const double px = price[j] * (1.0 + side * slip / 10000.0);
             const double notl = static_cast<double>(fill) * px;
             notional += notl;
             fees += notl * fee / 10000.0;
+            spread_cost += static_cast<double>(fill) * price[j] * spread_component / 10000.0;
+            impact_cost += static_cast<double>(fill) * price[j] * impact_component / 10000.0;
+            raw_notional += static_cast<double>(fill) * price[j];
             filled += fill;
         }
-        std::printf("%s,%lld,%.17g,%.17g\n", f[0].c_str(), static_cast<long long>(filled), notional, fees);
+        std::printf("%s,%lld,%.17g,%.17g,%.17g,%.17g,%.17g\n", f[0].c_str(), static_cast<long long>(filled),
+                     notional, fees, spread_cost, impact_cost, raw_notional);
     }
     return 0;
 }
