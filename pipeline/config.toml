@@ -44,16 +44,20 @@ alt_horizon_newey_west_lags = 10
 
 # Phase 4/5 execution simulator + backtest. Frozen before the first Phase 5 run.
 # Costs are per fill: price moves against the trader by spread + impact * sqrt(participation).
+# Cost-model values are assumed, uncalibrated: no real execution data backs these numbers.
 [phase4]
-slices            = 13       # synthetic intraday slices per trading day (30 minutes each)
-fee_bps           = 1.0
-spread_bps        = 1.0      # half-spread paid on every fill
-impact_bps        = 10.0     # bps per sqrt(fraction of slice volume)
-max_participation = 0.10     # max share of a slice's volume one order may take; excess carries forward
-latency_slices    = 1        # decision-to-market delay, in slices
-capital           = 25000000 # fixed notional, no compounding, so orders are identical across strategies
-top_n             = 5        # long-only: equal weight in the top_n predictions (no short selling)
-rebalance_days    = 5        # trading days between rebalances (the prediction horizon)
+slices               = 13       # synthetic intraday slices per trading day (30 minutes each)
+intraday_variant     = "base"   # base, swap_extremes, flat_volume, noisy_volume
+intraday_noise_seeds = [1, 2, 3, 4, 5]  # noisy_volume: 5 seeded paths, reported as mean and range
+fee_bps              = 1.0      # assumed, uncalibrated
+half_spread_bps      = 1.0      # assumed, uncalibrated; half-spread paid on every fill
+impact_coeff_bps     = 10.0     # assumed, uncalibrated; bps per sqrt(fraction of slice volume)
+participation_cap    = 0.10     # max share of a slice's volume one order may take; excess carries forward
+latency_slices       = 1        # decision-to-market delay, in slices
+cost_multiplier      = 1.0      # scales half_spread_bps and impact_coeff_bps only, not fee_bps
+capital              = 25000000 # fixed notional, no compounding, so orders are identical across strategies
+top_n                = 5        # long-only: equal weight in the top_n predictions (no short selling)
+rebalance_days       = 5        # trading days between rebalances (the prediction horizon)
 
 # Phase 6 paper loop. Execution strategy chosen mechanically from the Phase 5 report
 # (lowest mean total cost in bps), then frozen.
