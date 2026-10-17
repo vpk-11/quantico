@@ -22,6 +22,7 @@ import datetime as dt
 import sqlite3
 import sys
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -38,17 +39,60 @@ from walkforward import LIQUIDITY, Scaler, build_target
 _ROOT = Path(__file__).resolve().parents[1]
 REPORT_PATH = _ROOT / "reports" / "phase7_report.md"
 PAPER_TABLES = ["paper_fills", "paper_nav", "paper_predictions", "paper_targets"]
+ET = ZoneInfo("America/New_York")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS live_bars (
     ticker TEXT NOT NULL, date TEXT NOT NULL, open REAL NOT NULL, high REAL NOT NULL, low REAL NOT NULL,
     close REAL NOT NULL, adj_close REAL NOT NULL, volume INTEGER NOT NULL, PRIMARY KEY (ticker, date));
 CREATE TABLE IF NOT EXISTS paper_fills (
-    date TEXT, ticker TEXT, side INTEGER, qty INTEGER, filled INTEGER, notional REAL, fees REAL, open REAL);
-CREATE TABLE IF NOT EXISTS paper_nav (date TEXT PRIMARY KEY, nav REAL, cash REAL);
-CREATE TABLE IF NOT EXISTS paper_predictions (date TEXT, ticker TEXT, prediction REAL, PRIMARY KEY (date, ticker));
-CREATE TABLE IF NOT EXISTS paper_targets (decided_on TEXT, ticker TEXT, shares INTEGER, executed INTEGER DEFAULT 0);
+    date TEXT, ticker TEXT, side INTEGER, qty INTEGER, filled INTEGER, notional REAL, fees REAL, open REAL,
+    mode TEXT NOT NULL DEFAULT 'replay');
+CREATE TABLE IF NOT EXISTS paper_nav (date TEXT PRIMARY KEY, nav REAL, cash REAL, mode TEXT NOT NULL DEFAULT 'replay');
+CREATE TABLE IF NOT EXISTS paper_predictions (
+    date TEXT, ticker TEXT, prediction REAL, mode TEXT NOT NULL DEFAULT 'replay', PRIMARY KEY (date, ticker));
+CREATE TABLE IF NOT EXISTS paper_targets (
+    decided_on TEXT, ticker TEXT, shares INTEGER, executed INTEGER DEFAULT 0, mode TEXT NOT NULL DEFAULT 'replay');
 """
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Adds `mode` to any paper table created before it existed, backfilling existing rows as
+    'replay' (every row stored before this phase's review predates `replay_end_date`). Idempotent."""
+    for table in PAPER_TABLES:
+        cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
+        if cols and "mode" not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN mode TEXT")
+            conn.execute(f"UPDATE {table} SET mode = 'replay' WHERE mode IS NULL")
+    conn.commit()
+
+
+def mode_for(d: str, cfg: dict) -> str:
+    """'replay' up to and including `[phase6] replay_end_date`, 'forward' after. Derived from the
+    date being processed, never from clock time, so it never depends on when the job happens to run."""
+    return "replay" if d <= cfg["phase6"]["replay_end_date"] else "forward"
+
+
+def eligible_dates(days: list[str], now_et: dt.datetime) -> list[str]:
+    """Keeps dates strictly before today in US/Eastern, or today if the ET clock reads 17:00 or
+    later (so an in-progress trading day's bar is never processed as if it were final)."""
+    today_et = now_et.date().isoformat()
+    today_ok = now_et.hour >= 17
+    return [d for d in days if d < today_et or (d == today_et and today_ok)]
+
+
+def check_complete(conn: sqlite3.Connection, cfg: dict, d: str) -> bool:
+    """Returns True if every basket ticker has a `live_bars` row for `d`. Returns False (skip,
+    not halt) if none do, since that means `d` is not a trading day or nothing has been pulled
+    for it yet, not a bad partial pull. Halts (raises) if some tickers have a row and others do
+    not, which is a real data problem; never forward-fills."""
+    have = conn.execute("SELECT COUNT(DISTINCT ticker) FROM live_bars WHERE date = ?", (d,)).fetchone()[0]
+    want = len(rs.basket(cfg))
+    if have == 0:
+        return False
+    if have != want:
+        raise RuntimeError(f"{d}: {have} of {want} basket tickers have a live_bars row; halting, no forward-fill")
+    return True
 
 
 def sync_live(conn: sqlite3.Connection, cfg: dict, today: str) -> None:
@@ -108,41 +152,58 @@ def predict(conn: sqlite3.Connection, cfg: dict, d: str) -> pd.Series:
 
 def process_day(conn: sqlite3.Connection, cfg: dict, d: str, i: int) -> None:
     p, p6 = ex.cost_params(cfg["phase4"]), cfg["phase6"]
-    p["rebalance_days"] = cfg["phase3"]["target_horizon_days"]
+    mode = mode_for(d, cfg)
     bars_d = pd.read_sql_query("SELECT * FROM live_bars WHERE date = ?", conn, index_col="ticker", params=(d,))
     pos, cash = positions(conn, p["capital"])
     pending = conn.execute("SELECT ticker, shares FROM paper_targets WHERE executed = 0 AND decided_on < ?", (d,)).fetchall()
     if pending:
         tgt = dict(pending)
         trades = {t: tgt.get(t, 0) - pos.get(t, 0) for t in set(tgt) | set(pos)}
-        fills = bt.execute_day(trades, bars_d, ex.STRATEGIES[p6["strategy"]], p)
-        conn.executemany("INSERT INTO paper_fills VALUES (?,?,?,?,?,?,?,?)",
-                         [(d, f["ticker"], f["side"], f["qty"], f["filled"], f["notional"], f["fees"], f["open"]) for f in fills])
+        fills = bt.execute_day(trades, bars_d, ex.STRATEGIES[p6["paper_execution_strategy"]], p)
+        conn.executemany("INSERT INTO paper_fills VALUES (?,?,?,?,?,?,?,?,?)",
+                         [(d, f["ticker"], f["side"], f["qty"], f["filled"], f["notional"], f["fees"], f["open"], mode) for f in fills])
         conn.execute("UPDATE paper_targets SET executed = 1 WHERE executed = 0")
         pos, cash = positions(conn, p["capital"])
     nav = cash + sum(q * bars_d.at[t, "close"] for t, q in pos.items())
-    conn.execute("INSERT INTO paper_nav VALUES (?,?,?)", (d, nav, cash))
-    if i % p["rebalance_days"] == 0:
+    conn.execute("INSERT INTO paper_nav VALUES (?,?,?,?)", (d, nav, cash, mode))
+    if i % cfg["phase3"]["target_horizon_days"] == 0:
         pred = predict(conn, cfg, d)
-        conn.executemany("INSERT INTO paper_predictions VALUES (?,?,?)", [(d, t, float(v)) for t, v in pred.items()])
+        conn.executemany("INSERT INTO paper_predictions VALUES (?,?,?,?)", [(d, t, float(v), mode) for t, v in pred.items()])
         tgt = bt.top_n_targets(pred, bars_d["close"], p)
-        conn.executemany("INSERT INTO paper_targets (decided_on, ticker, shares) VALUES (?,?,?)", [(d, t, s) for t, s in tgt.items()])
+        conn.executemany("INSERT INTO paper_targets (decided_on, ticker, shares, mode) VALUES (?,?,?,?)",
+                         [(d, t, s, mode) for t, s in tgt.items()])
     conn.commit()
 
 
-def run(cfg: dict) -> int:
+def _process_pending(conn: sqlite3.Connection, cfg: dict, days: list[str]) -> tuple[int, int]:
+    """Processes every date in `days` not already in `paper_nav`, in order. A date with no bars
+    at all is skipped (not a trading day, or nothing pulled yet) and the loop continues; a date
+    with bars for only some tickers halts (propagates), so later dates are never processed ahead
+    of a genuinely incomplete one. Returns (total days considered, new days processed)."""
+    done = {r[0] for r in conn.execute("SELECT date FROM paper_nav")}
+    new = 0
+    for i, d in enumerate(days):
+        if d in done:
+            continue
+        if not check_complete(conn, cfg, d):
+            continue  # skip: no bars at all for this date, not a halt
+        process_day(conn, cfg, d, i)
+        new += 1
+    return len(days), new
+
+
+def run(cfg: dict, clock=lambda: dt.datetime.now(ET)) -> int:
     conn = sqlite3.connect(_ROOT / cfg["data"]["db_path"])
     conn.executescript(_SCHEMA)
+    _migrate(conn)
     try:
         sync_live(conn, cfg, dt.date.today().isoformat())
-        days = [r[0] for r in conn.execute(
+        all_days = [r[0] for r in conn.execute(
             "SELECT DISTINCT date FROM live_bars WHERE date >= ? ORDER BY date", (cfg["phase6"]["start_date"],))]
-        done = {r[0] for r in conn.execute("SELECT date FROM paper_nav")}
-        for i, d in enumerate(days):
-            if d not in done:
-                process_day(conn, cfg, d, i)
+        days = eligible_dates(all_days, clock())
+        total, new = _process_pending(conn, cfg, days)
         nav = conn.execute("SELECT date, nav FROM paper_nav ORDER BY date DESC LIMIT 1").fetchone()
-        print(f"processed through {nav[0]}, NAV {nav[1]:,.0f}, {len(days)} trading days, {len(days) - len(done)} new")
+        print(f"processed through {nav[0]}, NAV {nav[1]:,.0f}, {total} trading days, {new} new")
     finally:
         conn.close()
     return report(cfg)
@@ -150,7 +211,7 @@ def run(cfg: dict) -> int:
 
 def report(cfg: dict) -> int:
     p, conn = ex.cost_params(cfg["phase4"]), sqlite3.connect(_ROOT / cfg["data"]["db_path"])
-    p["rebalance_days"] = cfg["phase3"]["target_horizon_days"]
+    _migrate(conn)
     try:
         nav = pd.read_sql_query("SELECT date, nav FROM paper_nav ORDER BY date", conn, index_col="date")["nav"]
         fills = pd.read_sql_query("SELECT * FROM paper_fills", conn)
@@ -179,7 +240,8 @@ def report(cfg: dict) -> int:
 
     L = ["# Phase 6/7 report: forward paper run and tracking", "",
          f"Paper money only. Signal: baseline ridge refit at each rebalance (label: no validated edge). Execution: C++ simulator, "
-         f"`{cfg['phase6']['strategy']}`. Long-only top {p['top_n']} of 20, fixed ${p['capital']:,}, rebalance every {p['rebalance_days']} "
+         f"`{cfg['phase6']['paper_execution_strategy']}`. Long-only top {p['top_n']} of 20, fixed ${p['capital']:,}, rebalance every "
+         f"{cfg['phase3']['target_horizon_days']} "
          f"trading days. Intraday slices are synthetic (see phase5_report.md).", "",
          f"## Forward run: {nav.index[0]} to {nav.index[-1]} ({len(nav)} trading days)", "",
          "| metric | value |", "|---|---|",
@@ -207,21 +269,40 @@ def report(cfg: dict) -> int:
     return 0
 
 
-def reset(cfg: dict) -> int:
+def reset(cfg: dict, include_forward: bool = False) -> int:
+    """Drops the 4 paper tables (`live_bars` is kept). Refuses if any row is `mode='forward'`
+    (real paper trades, not replay) unless `include_forward` is set, so a reset can't silently
+    discard forward history."""
     conn = sqlite3.connect(_ROOT / cfg["data"]["db_path"])
-    for t in PAPER_TABLES:
-        conn.execute(f"DROP TABLE IF EXISTS {t}")
-    conn.commit()
-    conn.close()
+    try:
+        _migrate(conn)
+        if not include_forward:
+            for t in PAPER_TABLES:
+                cols = [r[1] for r in conn.execute(f"PRAGMA table_info({t})")]
+                if "mode" not in cols:
+                    continue
+                n = conn.execute(f"SELECT COUNT(*) FROM {t} WHERE mode = 'forward'").fetchone()[0]
+                if n:
+                    raise RuntimeError(f"{t} has {n} forward row(s); refusing to reset. "
+                                        "Pass --include-forward to drop them anyway.")
+        for t in PAPER_TABLES:
+            conn.execute(f"DROP TABLE IF EXISTS {t}")
+        conn.commit()
+    finally:
+        conn.close()
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Quantico paper trading loop (Phase 6/7)")
     parser.add_argument("cmd", choices=["run", "report", "reset"])
+    parser.add_argument("--include-forward", action="store_true",
+                        help="reset: allow dropping forward (real paper trade) rows")
     args = parser.parse_args(argv)
     cfg = rs.load_config()
-    return {"run": run, "report": report, "reset": reset}[args.cmd](cfg)
+    if args.cmd == "reset":
+        return reset(cfg, include_forward=args.include_forward)
+    return {"run": run, "report": report}[args.cmd](cfg)
 
 
 if __name__ == "__main__":
