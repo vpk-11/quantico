@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import sqlite3
+import statistics
 import sys
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -33,7 +34,8 @@ import execution as ex
 import features as ft
 import models
 import research_store as rs
-from evaluate import daily_ic, make_panel, newey_west_t
+import trials
+from evaluate import daily_ic, make_panel, newey_west_t, z_crit
 from walkforward import LIQUIDITY, Scaler, build_target
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -209,61 +211,247 @@ def run(cfg: dict, clock=lambda: dt.datetime.now(ET)) -> int:
     return report(cfg)
 
 
+def edge_rule(
+    n_rebalances: int, mean_ic: float, nw_t: float, z: float, strategy_sharpe: float,
+    null_sharpes: list[float], cfg7: dict,
+) -> tuple[bool, str]:
+    """Frozen before any forward data exists. 'Edge supported' only if: at least
+    `min_forward_rebalances`, forward mean IC above 0 with Newey-West t at or above the Phase 3
+    G1 critical value at the current trial count k, and the strategy Sharpe at or above the
+    `null_percentile_threshold` percentile of the random-top-N null. Otherwise 'no edge
+    established'. Pure function: every input is already computed, so this is unit-testable
+    without touching the database.
+    """
+    if n_rebalances < cfg7["min_forward_rebalances"]:
+        return False, f"insufficient sample: {n_rebalances} forward rebalances, need {cfg7['min_forward_rebalances']}"
+    cond_ic = mean_ic > 0 and nw_t >= z
+    pct = float((np.asarray(null_sharpes) < strategy_sharpe).mean() * 100) if len(null_sharpes) else 0.0
+    cond_null = pct >= cfg7["null_percentile_threshold"]
+    if cond_ic and cond_null:
+        return True, "edge supported"
+    return False, "no edge established"
+
+
+def _mode_bounds(nav_all: pd.DataFrame, mode: str, capital: float) -> tuple[str, str, float, float, pd.DataFrame] | None:
+    """(prior_date, last_date, nav_at_prior_date, nav_at_last_date, this mode's nav rows), sorted
+    by date. `nav_at_prior_date` is the carried-in NAV from the trading day right before this
+    mode started (starting `capital` if this mode is the very first data), so attribution can
+    measure the change *during* the mode without pooling it with the other mode's days."""
+    sub = nav_all[nav_all["mode"] == mode].sort_values("date")
+    if sub.empty:
+        return None
+    first_date = sub["date"].iloc[0]
+    prior = nav_all[nav_all["date"] < first_date]
+    prior_date = prior["date"].iloc[-1] if not prior.empty else first_date
+    nav0 = float(prior["nav"].iloc[-1]) if not prior.empty else capital
+    return prior_date, sub["date"].iloc[-1], nav0, float(sub["nav"].iloc[-1]), sub
+
+
+def attribution(mode_fills: pd.DataFrame, ew_nav: pd.Series, nav0: float, nav1: float, prior_date: str, last_date: str) -> dict:
+    """Total NAV change = market + selection + costs, each independently computed except
+    selection (the residual: what stock picking added or cost beyond just holding the market).
+    `costs` is signed negative (it reduces NAV). The three parts sum to `total` exactly:
+    frictionless = total + costs_paid; selection = frictionless - market;
+    market + selection + costs = market + frictionless - market - costs_paid = total.
+    """
+    costs_paid = float((mode_fills["side"] * (mode_fills["notional"] - mode_fills["filled"] * mode_fills["open"])
+                        + mode_fills["fees"]).sum()) if not mode_fills.empty else 0.0
+    ew0 = float(ew_nav.loc[prior_date]) if prior_date in ew_nav.index else float(ew_nav.iloc[0])
+    ew1 = float(ew_nav.loc[last_date])
+    market = ew1 - ew0
+    total = nav1 - nav0
+    frictionless = total + costs_paid
+    selection = frictionless - market
+    return {"total": total, "market": market, "selection": selection, "costs": -costs_paid}
+
+
+def _position_as_of(fills_all: pd.DataFrame, ticker: str, as_of_date: str) -> int:
+    tf = fills_all[(fills_all["ticker"] == ticker) & (fills_all["date"] <= as_of_date)]
+    return int((tf["side"] * tf["filled"]).sum())
+
+
+def sector_pnl(
+    fills_all: pd.DataFrame, mode_fills: pd.DataFrame, close: pd.DataFrame, basket: list[tuple[str, str]],
+    prior_date: str, last_date: str,
+) -> pd.Series:
+    """Per-ticker frictionless P&L (position mark-to-market plus frictionless trade cash flow),
+    grouped by sector. Sums to the same `selection + market` (the frictionless change) as
+    `attribution`'s residual, which is an exact accounting identity, checked in tests."""
+    rows = []
+    for ticker, sector in basket:
+        pos0, pos1 = _position_as_of(fills_all, ticker, prior_date), _position_as_of(fills_all, ticker, last_date)
+        price0 = float(close.at[prior_date, ticker]) if prior_date in close.index else float(close[ticker].iloc[0])
+        price1 = float(close.at[last_date, ticker])
+        tf = mode_fills[mode_fills["ticker"] == ticker]
+        frictionless_cash = float((-tf["side"] * tf["filled"] * tf["open"]).sum()) if not tf.empty else 0.0
+        rows.append({"sector": sector, "pnl": pos1 * price1 - pos0 * price0 + frictionless_cash})
+    return pd.DataFrame(rows).groupby("sector")["pnl"].sum()
+
+
+def mode_comparators(full_bars: pd.DataFrame, close: pd.DataFrame, mode_preds: pd.DataFrame, p: dict, cfg7: dict) -> tuple[float, list[float]]:
+    """Equal-weight-20 Sharpe and the random-top-N null Sharpe distribution, both over exactly
+    `mode_preds`'s rebalance dates. `mode_preds` already holds one row set per rebalance (Phase 6
+    stores predictions only on rebalance days), so `rebalance_days=1` keeps every one of them."""
+    pred_by_day = {d: g.set_index("ticker")["prediction"] for d, g in mode_preds.groupby("date")}
+    exec_for = bt.rebalance_schedule(close, mode_preds, rebalance_days=1)
+    null_sharpes = bt.random_null_sharpes(full_bars, close, pred_by_day, exec_for, ex.STRATEGIES["immediate"],
+                                           p, cfg7["null_draws"], cfg7["null_seed"])
+    dates = sorted(exec_for)
+    ew = close.loc[dates].div(close.loc[dates[0]]).mean(axis=1) * p["capital"]
+    r = ew.pct_change().dropna()
+    ew_sharpe = float(r.mean() / r.std() * np.sqrt(252)) if len(r) > 1 and r.std() > 0 else float("nan")
+    return ew_sharpe, null_sharpes
+
+
+def _ic_series(preds: pd.DataFrame, realized: pd.DataFrame, min_tickers: int) -> pd.Series:
+    """Daily rank IC indexed by date, for whatever rows `preds` holds (already mode-filtered)."""
+    if preds.empty:
+        return pd.Series(dtype=float)
+    f = preds.merge(realized, on=["ticker", "date"]).dropna(subset=["target"])
+    if f.empty:
+        return pd.Series(dtype=float)
+    panel = make_panel(f["date"].to_numpy(), f["ticker"].to_numpy())
+    ic = daily_ic(f["prediction"].to_numpy(), f["target"].to_numpy(), panel, min_tickers)
+    s = pd.Series(ic, index=panel.dates)
+    return s[~s.isna()]
+
+
+def render_mode(
+    mode: str, nav_all: pd.DataFrame, fills_all: pd.DataFrame, preds_all: pd.DataFrame, realized: pd.DataFrame,
+    full_bars: pd.DataFrame, close: pd.DataFrame, ew_nav: pd.Series, by_year: pd.DataFrame, cfg: dict, p: dict,
+    k: int, z: float,
+) -> list[str]:
+    cfg3, cfg7 = cfg["phase3"], cfg["phase7"]
+    L = [f"## {mode.capitalize()}", ""]
+    bounds = _mode_bounds(nav_all, mode, p["capital"])
+    if bounds is None:
+        L += [f"No {mode} data yet.", ""]
+        return L
+    prior_date, last_date, nav0, nav1, nav_rows = bounds
+    mode_fills = fills_all[fills_all["mode"] == mode]
+    mode_preds = preds_all[preds_all["mode"] == mode][["date", "ticker", "prediction"]]
+    n_rebalances = mode_preds["date"].nunique()
+    ic_series = _ic_series(mode_preds, realized, cfg3["min_tickers_per_day"])
+    mean_ic = float(ic_series.mean()) if len(ic_series) else float("nan")
+    nw_t = float(newey_west_t(ic_series.to_numpy(), 1)) if len(ic_series) > 3 else float("nan")
+
+    nav_series = nav_rows.set_index("date")["nav"]
+    r = nav_series.pct_change().dropna()
+    sharpe = float(r.mean() / r.std() * np.sqrt(252)) if len(r) > 1 and r.std() > 0 else float("nan")
+    dd = float((nav_series / nav_series.cummax() - 1.0).min())
+
+    L += [f"{nav_rows['date'].iloc[0]} to {last_date} ({len(nav_rows)} trading days, {n_rebalances} rebalances, "
+          f"{len(ic_series)} with a matured {cfg3['target_horizon_days']}-day outcome).", "",
+          "| metric | value |", "|---|---|",
+          f"| NAV start / end | {nav0:,.0f} / {nav1:,.0f} |",
+          f"| return | {nav1 / nav0 - 1:.2%} |",
+          f"| Sharpe (annualized, daily) | {sharpe:.2f} |",
+          f"| max drawdown | {dd:.2%} |",
+          f"| forward rank IC | mean {mean_ic:.4f}" + (f", Newey-West t {nw_t:.2f} |" if not np.isnan(nw_t) else " |"), ""]
+
+    if mode == "forward" and n_rebalances < cfg7["min_forward_rebalances"]:
+        L += [f"Insufficient sample: {n_rebalances} forward rebalances, need "
+              f"{cfg7['min_forward_rebalances']}. No claim on edge or decay.", ""]
+        return L
+
+    att = attribution(mode_fills, ew_nav, nav0, nav1, prior_date, last_date)
+    L += ["### Attribution (USD)", "",
+          "| component | value |", "|---|---|",
+          f"| market (equal-weight 20) | {att['market']:,.0f} |",
+          f"| selection | {att['selection']:,.0f} |",
+          f"| costs | {att['costs']:,.0f} |",
+          f"| total NAV change | {att['total']:,.0f} |", ""]
+
+    pnl = sector_pnl(fills_all, mode_fills, close, rs.basket(cfg), prior_date, last_date)
+    L += ["### Sector contribution (frictionless P&L, USD)", "", "| sector | pnl |", "|---|---|"]
+    for sector, v in pnl.sort_values(ascending=False).items():
+        L.append(f"| {sector} | {v:,.0f} |")
+    L.append("")
+
+    if len(ic_series) >= 2:
+        window = min(cfg7["decay_window_rebalances"], len(ic_series))
+        roll = float(ic_series.iloc[-window:].mean())
+        roll_t = float(newey_west_t(ic_series.iloc[-window:].to_numpy(), 1)) if window > 3 else float("nan")
+        x = np.arange(len(ic_series))
+        y = ic_series.to_numpy()
+        slope = float(np.polyfit(x, y, 1)[0])
+        band_lo, band_hi = float(by_year["mean"].min()), float(by_year["mean"].max())
+        inside = band_lo <= mean_ic <= band_hi
+        L += ["### Signal decay", "",
+              f"Rolling {window}-rebalance IC: {roll:.4f}" + (f", Newey-West t {roll_t:.2f}." if not np.isnan(roll_t) else "."),
+              f"Trend (IC vs rebalance index): slope {slope:.6f} ({'rising' if slope > 0 else 'falling'}).",
+              f"Phase 3 out-of-sample yearly IC band: {band_lo:.4f} to {band_hi:.4f}. "
+              f"{mode.capitalize()} mean IC is {'inside' if inside else 'outside'} that band.", ""]
+
+    ew_sharpe, null_sharpes = mode_comparators(full_bars, close, mode_preds, p, cfg7)
+    pct = float((np.asarray(null_sharpes) < sharpe).mean() * 100) if null_sharpes else float("nan")
+    L += ["### Comparators", "",
+          f"Equal-weight buy-and-hold Sharpe over the same dates: {ew_sharpe:.2f} "
+          "(flattered by survivorship bias: all 20 names survived to 2026).",
+          f"Random top-{p['top_n']} null, {len(null_sharpes)} seeded draws, same rebalance schedule "
+          f"and cost model: Sharpe mean {statistics.mean(null_sharpes):.2f}, range "
+          f"{min(null_sharpes):.2f} to {max(null_sharpes):.2f}. Strategy Sharpe sits at the "
+          f"{pct:.0f}th percentile.", ""]
+
+    if mode == "forward":
+        supported, label = edge_rule(n_rebalances, mean_ic, nw_t, z, sharpe, null_sharpes, cfg7)
+        L += [f"**Edge claim: {label}.**", ""]
+    return L
+
+
 def report(cfg: dict) -> int:
     p, conn = ex.cost_params(cfg["phase4"]), sqlite3.connect(_ROOT / cfg["data"]["db_path"])
     _migrate(conn)
     try:
-        nav = pd.read_sql_query("SELECT date, nav FROM paper_nav ORDER BY date", conn, index_col="date")["nav"]
-        fills = pd.read_sql_query("SELECT * FROM paper_fills", conn)
-        pos, cash = positions(conn, p["capital"])
-        fwd = pd.read_sql_query("SELECT * FROM paper_predictions", conn)
+        verdict, label = bt.phase3_label(conn, cfg)
+        k = trials.count_k(conn)
+        nav_all = pd.read_sql_query("SELECT date, nav, mode FROM paper_nav ORDER BY date", conn)
+        fills_all = pd.read_sql_query("SELECT * FROM paper_fills", conn)
+        preds_all = pd.read_sql_query("SELECT * FROM paper_predictions", conn)
         base = pd.read_sql_query("SELECT ticker, date, prediction, target FROM predictions WHERE model_id = ?", conn, params=(bt.MODEL_ID,))
-        bars = pd.read_sql_query("SELECT ticker, date, close FROM daily_bars UNION ALL SELECT ticker, date, close FROM live_bars "
-                                 "ORDER BY ticker, date", conn)
+        bars_close = pd.read_sql_query("SELECT ticker, date, close FROM daily_bars UNION ALL SELECT ticker, date, close FROM live_bars "
+                                       "ORDER BY date, ticker", conn)
+        full_bars = pd.read_sql_query(
+            "SELECT ticker, date, open, high, low, close, volume FROM daily_bars UNION ALL "
+            "SELECT ticker, date, open, high, low, close, volume FROM live_bars ORDER BY date, ticker",
+            conn).set_index(["date", "ticker"])
+        last_data_date = conn.execute("SELECT MAX(date) FROM paper_nav").fetchone()[0]
     finally:
         conn.close()
-    h = cfg["phase3"]["target_horizon_days"]
-    realized = build_target(bars, h)[["ticker", "date", "target"]]
-    fwd = fwd.merge(realized, on=["ticker", "date"]).dropna(subset=["target"])
+    z = z_crit(cfg["phase3"]["significance_alpha"] / k)
+    realized = build_target(bars_close, cfg["phase3"]["target_horizon_days"])[["ticker", "date", "target"]]
+    close = bars_close.set_index(["date", "ticker"])["close"].unstack()
     min_t = cfg["phase3"]["min_tickers_per_day"]
 
-    def ic_by(frame: pd.DataFrame):
-        pan = make_panel(frame["date"].to_numpy(), frame["ticker"].to_numpy())
-        return pan, daily_ic(frame["prediction"].to_numpy(), frame["target"].to_numpy(), pan, min_t)
+    if nav_all.empty:
+        ew_nav = pd.Series(dtype=float)
+    else:
+        paper_dates = sorted(nav_all["date"].unique())
+        ew_nav = close.loc[paper_dates].div(close.loc[paper_dates[0]]).mean(axis=1) * p["capital"]
 
-    pan_b, ic_b = ic_by(base)
+    pan_b = make_panel(base["date"].to_numpy(), base["ticker"].to_numpy())
+    ic_b = daily_ic(base["prediction"].to_numpy(), base["target"].to_numpy(), pan_b, min_t)
     by_year = pd.Series(ic_b, index=pan_b.years).groupby(level=0).agg(["mean", "count"])
-    pan_f, ic_f = ic_by(fwd)
-    ic_f = ic_f[~np.isnan(ic_f)]
-    r = nav.pct_change().dropna()
-    dd = (nav / nav.cummax() - 1.0).min()
 
-    L = ["# Phase 6/7 report: forward paper run and tracking", "",
-         f"Paper money only. Signal: baseline ridge refit at each rebalance (label: no validated edge). Execution: C++ simulator, "
-         f"`{cfg['phase6']['paper_execution_strategy']}`. Long-only top {p['top_n']} of 20, fixed ${p['capital']:,}, rebalance every "
-         f"{cfg['phase3']['target_horizon_days']} "
-         f"trading days. Intraday slices are synthetic (see phase5_report.md).", "",
-         f"## Forward run: {nav.index[0]} to {nav.index[-1]} ({len(nav)} trading days)", "",
-         "| metric | value |", "|---|---|",
-         f"| NAV start / end | {p['capital']:,.0f} / {nav.iloc[-1]:,.0f} |",
-         f"| return | {nav.iloc[-1] / p['capital'] - 1:.2%} |",
-         f"| Sharpe (annualized, daily) | {r.mean() / r.std() * np.sqrt(252):.2f} |",
-         f"| max drawdown | {dd:.2%} |",
-         f"| daily P&L mean / best / worst (USD) | {nav.diff().mean():,.0f} / {nav.diff().max():,.0f} / {nav.diff().min():,.0f} |",
-         f"| fills | {len(fills)} orders, fees USD {fills['fees'].sum():,.0f} |",
-         f"| open positions | {', '.join(f'{t} {q}' for t, q in sorted(pos.items())) or 'none'} (cash {cash:,.0f}) |", "",
-         "A short window on a signal with no validated edge: return and Sharpe here are descriptive, not evidence of skill.", "",
-         "## Signal decay", "",
-         f"Forward rank IC on {len(ic_f)} rebalance days with a matured {h}-day outcome: mean "
-         f"{(ic_f.mean() if len(ic_f) else float('nan')):.4f}"
-         + (f", Newey-West t {newey_west_t(ic_f, 1):.2f}." if len(ic_f) > 3 else "."),
-         "", "Out-of-sample IC by year, Phase 3 baseline (daily, all days):", "", "| year | mean IC | days |", "|---|---|---|"]
+    L = ["# Phase 6/7 report: paper trading loop and performance tracking", "",
+         f"Phase 3 verdict: **{verdict}** ({label}). Replay and forward are reported separately and "
+         "never pooled; no edge claim is made unless the rule below passes.", "",
+         f"Last updated: {last_data_date} (from the data, not the clock). Paper money only. Signal: "
+         "baseline ridge refit at each rebalance. Execution: C++ simulator, "
+         f"`{cfg['phase6']['paper_execution_strategy']}`. Long-only top {p['top_n']} of 20, fixed "
+         f"${p['capital']:,}, rebalance every {cfg['phase3']['target_horizon_days']} trading days. "
+         "Intraday slices are synthetic (see phase5_report.md).", "",
+         "Limits: survivorship bias (all 20 names survived to 2026), price basis is `close` (no "
+         "dividends), cost model is assumed and uncalibrated, the window is short, and dates up to "
+         f"`[phase6] replay_end_date` are a pseudo-live replay, not true paper trading.", ""]
+    for mode in ("replay", "forward"):
+        L += render_mode(mode, nav_all, fills_all, preds_all, realized, full_bars, close, ew_nav, by_year, cfg, p, k, z)
+
+    L += ["## Phase 3 out-of-sample yearly IC (for comparison)", "", "| year | mean IC | days |", "|---|---|---|"]
     for y, row in by_year.iterrows():
         L.append(f"| {y} | {row['mean']:.4f} | {int(row['count'])} |")
-    L += ["", "Reading: yearly IC flips sign (positive 2016 to 2018 and 2023 to 2025, negative 2019 to 2022 in Phase 3), which is what "
-          "an edge that never cleared its significance gates looks like. The forward mean sits inside that range and, at this sample "
-          "size, cannot be told apart from zero. A decay claim needs the forward IC to leave that band for a sustained stretch; "
-          "none is asserted here.", ""]
+    L += ["", "Yearly IC flips sign (positive 2016 to 2018 and 2023 to 2025, negative 2019 to 2022), "
+          "which is what an edge that never cleared its significance gates looks like.", ""]
     REPORT_PATH.write_text("\n".join(L))
     print(f"report: {REPORT_PATH}")
     return 0
