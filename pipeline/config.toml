@@ -13,6 +13,81 @@ max_gap_days = 5             # consecutive trading rows farther apart than this 
 momentum_windows_days      = [21, 63, 126, 252]  # ~1mo / 3mo / 6mo / 12mo trailing return
 mean_reversion_window_days = 20                   # also drives the volatility and liquidity windows
 
+# Phase 3 baseline model + walk-forward validation. Every value below is frozen
+# before the first scoring run. Changing a model, target or threshold value
+# after seeing a result is a new trial (see .claude/context/constraints.md).
+[phase3]
+target_horizon_days = 5      # forward return horizon in trading days; also the purge gap
+initial_train_years = 8      # calendar years in the first training window
+test_step_years     = 1
+ridge_alpha         = 1.0    # fixed penalty, no tuning in the baseline
+log_liquidity       = true   # log of dollar volume at model-input time only
+min_tickers_per_day = 10     # a date needs this many non-null tickers to produce an IC
+significance_alpha  = 0.05   # divided by trial count k for every gate
+newey_west_lags     = 5
+min_positive_years  = 7      # G3: test years with positive mean IC, of 10
+n_permutations      = 200    # G4 shuffled walk-forward reruns
+bootstrap_resamples = 2000   # G5
+bootstrap_block_days = 20    # G5 block length in trading days
+random_seed         = 42
+
+# Phase 3.5 escalation comparisons. Frozen before the first run. Each candidate
+# is a trial and tightens the bar (significance_alpha / k) for all of them.
+[phase3_5]
+rf_n_estimators = 300
+rf_max_depth = 6
+rf_min_samples_leaf = 200
+rf_max_features = 0.5
+recency_half_lives_years = [2, 4, 8]
+alt_horizon_days = 10
+alt_horizon_newey_west_lags = 10
+
+# Phase 4/5 execution simulator + backtest. Frozen before the first Phase 5 run.
+# Costs are per fill: price moves against the trader by spread + impact * sqrt(participation).
+# Cost-model values are assumed, uncalibrated: no real execution data backs these numbers.
+[phase4]
+slices               = 13       # synthetic intraday slices per trading day (30 minutes each)
+intraday_variant     = "base"   # base, swap_extremes, flat_volume, noisy_volume
+intraday_noise_seeds = [1, 2, 3, 4, 5]  # noisy_volume: 5 seeded paths, reported as mean and range
+fee_bps              = 1.0      # assumed, uncalibrated
+half_spread_bps      = 1.0      # assumed, uncalibrated; half-spread paid on every fill
+impact_coeff_bps     = 10.0     # assumed, uncalibrated; bps per sqrt(fraction of slice volume)
+participation_cap    = 0.10     # max share of a slice's volume one order may take; excess carries forward
+latency_slices       = 1        # decision-to-market delay, in slices
+cost_multiplier      = 1.0      # scales half_spread_bps and impact_coeff_bps only, not fee_bps
+capital              = 25000000 # base-cell fixed notional, no compounding; Phase 5 sweeps this
+top_n                = 5        # long-only: equal weight in the top_n predictions (no short selling)
+# rebalance_days is not a config key: it is cfg["phase3"]["target_horizon_days"] everywhere,
+# never duplicated, so the two cannot drift apart.
+
+# Phase 5 robustness grid: base portfolio rules above, swept across every combination below.
+# noisy_volume is not in intraday_variants: it uses [phase4] intraday_noise_seeds (5 paths),
+# reported as mean and range rather than as its own grid row.
+[phase5]
+intraday_variants = ["base", "swap_extremes", "flat_volume"]
+cost_multipliers  = [0.5, 1.0, 2.0]
+capital_levels    = [25000000, 250000000, 2500000000]
+null_draws        = 200   # random top-5 null, seeded draws
+null_seed         = 11
+
+# Phase 6 paper loop. Execution strategy chosen mechanically from the Phase 5 report
+# (lowest mean total cost in bps), then frozen.
+[phase6]
+paper_execution_strategy = "immediate"  # chosen after seeing the Phase 5 result, not pre-registered;
+                                          # measured gap to the other strategies was 0.37-0.72 bps at feasible cells
+start_date      = "2026-01-02"  # first trading day of the forward paper run
+live_pull_from  = "2025-11-01"  # overlap with daily_bars is checked, not trusted
+replay_end_date = "2026-10-12"  # dates up to and including this are mode=replay; later is mode=forward
+
+# Phase 7 performance tracking. Edge claim rule frozen before any forward data exists.
+[phase7]
+min_forward_rebalances   = 52   # about one year of trading days; below this, forward section
+                                  # reports numbers but draws no edge/decay conclusion
+decay_window_rebalances  = 12    # rolling signal-decay window, in rebalances
+null_draws               = 200   # random top-N null for the comparator and the edge rule
+null_seed                = 17
+null_percentile_threshold = 95   # edge rule: strategy Sharpe must clear this percentile of the null
+
 # 20 large-cap US equities, one entry per GICS sector group, all with full
 # daily history from Jan 2007. Post-2007 IPOs (META, TSLA, V) are deliberately
 # excluded so every series spans the full range. Survivorship bias is a
