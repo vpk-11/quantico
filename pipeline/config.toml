@@ -73,9 +73,11 @@ null_seed         = 11
 # Phase 6 paper loop. Execution strategy chosen mechanically from the Phase 5 report
 # (lowest mean total cost in bps), then frozen.
 [phase6]
-strategy   = "immediate"     # Phase 5 result, 3.57 bps vs 4.67 (TWAP) and 4.72 (VWAP)
-start_date = "2026-01-02"    # first trading day of the forward paper run
-live_pull_from = "2025-11-01" # overlap with daily_bars is checked, not trusted
+paper_execution_strategy = "immediate"  # chosen after seeing the Phase 5 result, not pre-registered;
+                                          # measured gap to the other strategies was 0.37-0.72 bps at feasible cells
+start_date      = "2026-01-02"  # first trading day of the forward paper run
+live_pull_from  = "2025-11-01"  # overlap with daily_bars is checked, not trusted
+replay_end_date = "2026-10-12"  # dates up to and including this are mode=replay; later is mode=forward
 
 # 20 large-cap US equities, one entry per GICS sector group, all with full
 # daily history from Jan 2007. Post-2007 IPOs (META, TSLA, V) are deliberately
