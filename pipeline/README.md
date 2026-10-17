@@ -29,6 +29,8 @@ pipeline/
   scripts/
     run_phase35.sh     Phase 3.5 run + verify (hours, random forest nulls)
     daily.sh           daily paper step (cron-ready)
+    install_schedule.sh, uninstall_schedule.sh   launchd schedule, not installed by any tool
+    launchd/com.quantico.daily.plist.template
   tests/
     test_research_store.py   offline: clean() logic + sqlite round-trip
     test_features.py          offline: feature formulas + no-lookahead + round-trip
@@ -77,6 +79,25 @@ python src/backtest.py bench                           # Phase 4: C++ vs Python 
 python src/paper.py run                                # Phase 6/7: pull bars, process new days, write reports/phase7_report.md
 bash scripts/daily.sh                                  # the same, as a cron job
 ```
+
+## Phase 6 scheduler
+
+`scripts/daily.sh` is cron-ready as-is. For a local macOS schedule instead:
+
+```
+bash scripts/install_schedule.sh    # renders the launchd plist, loads it (weekdays 17:30 local)
+bash scripts/uninstall_schedule.sh  # unloads and removes it
+```
+
+Neither script is run by any tool in this repo; installing the schedule is a
+manual step. `RunAtLoad` is set, so a sleeping laptop catches up on wake:
+`paper.py run` processes every missed trading day in order (`_process_pending`),
+halting without marking a date processed if any basket ticker is missing a
+`live_bars` row for it (`check_complete`), so later days are never processed
+ahead of an incomplete one. A date is only attempted once it is strictly
+before today in US/Eastern, or today after 17:00 ET (`eligible_dates`).
+AWS/Terraform/GitHub Actions are deferred as an optional later phase; a
+once-a-day batch needs a scheduler, not a cloud service.
 
 `features.py build` needs `daily_bars` to exist already (run `research_store.py
 build` first).
