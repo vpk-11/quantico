@@ -1,4 +1,6 @@
 # Quantico
+<!-- version: v0.2.0 -->
+![Version](https://img.shields.io/badge/version-v0.2.0-blue)
 
 A quantitative research pipeline that predicts 5-trading-day forward returns for liquid US
 equities, validates those predictions without look-ahead bias, and tests them against a modeled
@@ -82,3 +84,6 @@ python -m pytest pipeline/tests
 `python tests/test_<name>.py`): `test_research_store.py` (9), `test_features.py` (10),
 `test_phase3.py` (17), `test_phase35.py` (9), `test_phase4.py` (12), `test_phase5.py` (7),
 `test_phase6.py` (13), `test_phase7.py` (10).
+
+## Changelog
+- **v0.2.0** (2026-09-28): minor bump
