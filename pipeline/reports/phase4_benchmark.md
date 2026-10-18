@@ -4,8 +4,8 @@
 
 | orders | C++ median (s) | C++ spread (s) | Python median (s) | Python spread (s) | faster |
 |---|---|---|---|---|---|
-| 2,000 | 0.007 | 0.001 | 0.008 | 0.000 | C++ |
-| 20,000 | 0.043 | 0.002 | 0.081 | 0.002 | C++ |
-| 200,000 | 0.404 | 0.001 | 0.819 | 0.016 | C++ |
+| 2,000 | 0.008 | 0.057 | 0.008 | 0.002 | C++ |
+| 20,000 | 0.044 | 0.001 | 0.082 | 0.001 | C++ |
+| 200,000 | 0.419 | 0.015 | 0.833 | 0.026 | C++ |
 
 The speed claim is limited to this table: end to end, on synthetic orders, with Python-side packing included. The C++ simulator is also an independent, bit-exact-parity-checked implementation (see test_phase4.py).
