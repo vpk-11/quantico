@@ -37,9 +37,11 @@ pipeline/
     test_phase3.py            offline: Phase 3 integrity tests on synthetic data
     test_phase35.py           offline: weights, horizon-10, random forest integrity, adoption rule
     test_phase4.py            C++ vs Python reference bit-exact parity (needs `make -C simulator`)
+    test_phase5.py            cost decomposition consistency, partial-fill reporting
     test_phase6.py            offline: fill accounting, target selection, no-lookahead in predict
+    test_phase7.py            edge-claim rule, attribution sums, replay/forward isolation
   reports/
-    phase3_report.md, phase3_5_report.md, phase5_report.md, phase7_report.md   generated (tracked)
+    phase3_report.md, phase3_5_report.md, phase4_benchmark.md, phase5_report.md, phase7_report.md   generated (tracked)
   data/
     research_store.db  SQLite store (git-ignored, holds daily_bars + features + trials + predictions)
 ```
@@ -88,6 +90,9 @@ bash scripts/daily.sh                                  # the same, as a cron job
 bash scripts/install_schedule.sh    # renders the launchd plist, loads it (weekdays 17:30 local)
 bash scripts/uninstall_schedule.sh  # unloads and removes it
 ```
+
+The 17:30 trigger is machine local time. The ET cutoff below is what gates
+processing, so a non-Eastern machine just picks a day up on a later run.
 
 Neither script is run by any tool in this repo; installing the schedule is a
 manual step. `RunAtLoad` is set, so a sleeping laptop catches up on wake:
@@ -161,6 +166,12 @@ Verdict at k=1: FAIL, "no validated edge" (mean IC 0.0062, Newey-West t 0.53).
 All six integrity tests pass. Predictions are stored in `predictions` and the
 full result is in `reports/phase3_report.md`.
 
+## Newey-West settings
+
+Phase 3 reports Newey-West t on its daily IC series with `newey_west_lags = 5`.
+The paper report (`paper.py`) computes it on the IC at each rebalance (one point
+per 5 trading days) with 1 lag. The two t-statistics are not comparable.
+
 ## Undo
 
 Delete `data/research_store.db` and rebuild:
@@ -172,9 +183,8 @@ recreates the `features` table each run, so a change to
 ## Tests
 
 ```
-python tests/test_research_store.py     # or: python -m pytest tests
-python tests/test_features.py
-python tests/test_phase3.py
+make -C ../simulator                    # test_phase4.py and test_phase6.py need the binary
+python -m pytest tests                  # or one file at a time: python tests/test_<name>.py
 ```
 
 No framework required; each file has a plain `assert`-based runner. `pytest`

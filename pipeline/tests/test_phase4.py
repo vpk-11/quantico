@@ -222,6 +222,7 @@ def test_cpp_fill_invariants_random():
         orders.append({"id": i, "side": int(rng.choice([-1, 1])), "strategy": int(rng.integers(0, 3)),
                        "qty": int(rng.choice([0, 1, 13, 2_000_000])), "prices": px, "vols": vol})
     for o, r in zip(orders, ex.simulate(orders, p)):
+        assert r["id"] == o["id"]
         assert 0 <= r["filled"] <= o["qty"]
         assert (r["notional"] > 0) == (r["filled"] > 0)
         assert r["fees"] >= 0 and r["spread_cost"] >= 0 and r["impact_cost"] >= 0

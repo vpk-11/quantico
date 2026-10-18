@@ -29,6 +29,8 @@ struct Result {
     double notional, fees, spread_cost, impact_cost, raw_notional;
 };
 
+static_assert(sizeof(Result) == 48, "Result must match the 48-byte record execution.py reads");
+
 static void die(const std::string& msg) {
     std::fprintf(stderr, "sim: %s\n", msg.c_str());
     std::exit(2);
