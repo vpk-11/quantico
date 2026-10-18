@@ -80,9 +80,9 @@ Full commands, undo notes, and generated reports are in `pipeline/README.md`.
 python -m pytest pipeline/tests
 ```
 
-87 tests across 8 files, no framework required (each file also runs standalone with
+91 tests across 8 files, no framework required (each file also runs standalone with
 `python tests/test_<name>.py`): `test_research_store.py` (9), `test_features.py` (10),
-`test_phase3.py` (17), `test_phase35.py` (9), `test_phase4.py` (12), `test_phase5.py` (7),
+`test_phase3.py` (17), `test_phase35.py` (9), `test_phase4.py` (16), `test_phase5.py` (7),
 `test_phase6.py` (13), `test_phase7.py` (10).
 
 ## Changelog
