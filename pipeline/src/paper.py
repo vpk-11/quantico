@@ -452,6 +452,7 @@ def report(cfg: dict) -> int:
         L.append(f"| {y} | {row['mean']:.4f} | {int(row['count'])} |")
     L += ["", "Yearly IC flips sign (positive 2016 to 2018 and 2023 to 2025, negative 2019 to 2022), "
           "which is what an edge that never cleared its significance gates looks like.", ""]
+    REPORT_PATH.parent.mkdir(exist_ok=True)
     REPORT_PATH.write_text("\n".join(L))
     print(f"report: {REPORT_PATH}")
     return 0

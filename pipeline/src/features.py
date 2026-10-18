@@ -19,7 +19,7 @@ later phase if a total-return framing is wanted; Phase 2 uses `close`.
 
 Warm-up: the first rows of each ticker cannot fill a full window. Those cells
 are stored as NULL (not 0, not backfilled). Each feature's first live date is
-reported by `build` and pinned in .claude/context/architecture.md.
+reported by `build`.
 
 Usage (run from pipeline/):
     python src/features.py build                   # compute + store for the whole basket

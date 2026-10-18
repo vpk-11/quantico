@@ -15,7 +15,7 @@ mean_reversion_window_days = 20                   # also drives the volatility a
 
 # Phase 3 baseline model + walk-forward validation. Every value below is frozen
 # before the first scoring run. Changing a model, target or threshold value
-# after seeing a result is a new trial (see .claude/context/constraints.md).
+# after seeing a result is a new trial (a new trial under the pre-registered rules).
 [phase3]
 target_horizon_days = 5      # forward return horizon in trading days; also the purge gap
 initial_train_years = 8      # calendar years in the first training window
@@ -91,7 +91,7 @@ null_percentile_threshold = 95   # edge rule: strategy Sharpe must clear this pe
 # 20 large-cap US equities, one entry per GICS sector group, all with full
 # daily history from Jan 2007. Post-2007 IPOs (META, TSLA, V) are deliberately
 # excluded so every series spans the full range. Survivorship bias is a
-# disclosed, accepted limitation (see .claude/context/architecture.md).
+# disclosed, accepted limitation.
 [data.basket]
 information_technology  = ["AAPL", "MSFT", "NVDA"]
 communication_services = ["GOOGL", "DIS"]
