@@ -171,6 +171,62 @@ def test_simulate_determinism():
     assert a == b
 
 
+def _order(**kw) -> dict:
+    px, vol = ex.make_slices(100, 102, 98, 101, 1_000_000, 13)
+    return {"id": 0, "side": 1, "strategy": 1, "qty": 5_000, "prices": px, "vols": vol, **kw}
+
+
+def test_cpp_rejects_bad_input():
+    import pytest
+    bad = [
+        {"side": 0}, {"strategy": 3}, {"strategy": -1}, {"qty": -1}, {"qty": 2**53 + 1},
+        {"prices": [float("nan")] * 13}, {"prices": [0.0] * 13}, {"prices": [float("inf")] * 13},
+        {"vols": [-1] * 13}, {"vols": [2**53 + 1] * 13},
+    ]
+    for kw in bad:
+        with pytest.raises(RuntimeError, match="simulator exited 2"):
+            ex.simulate([_order(**kw)], _p())
+    assert ex.simulate([], _p()) == []
+
+
+def test_cpp_rejects_truncated_stream_and_bad_args():
+    import subprocess
+    args = [str(ex.SIM_BIN), "1.0", "1.0", "10.0", "0.1", "1", "13"]
+    short = subprocess.run(args, input=np.array([1, 1, 5], dtype="<i8").tobytes() + b"\x00" * 30, capture_output=True)
+    assert short.returncode == 2 and b"truncated" in short.stderr
+    for i, v in [(1, "x"), (1, "-1"), (3, "nan"), (4, "0"), (4, "1.5"), (5, "-1"), (6, "0")]:
+        a = list(args)
+        a[i] = v
+        r = subprocess.run(a, input=b"", capture_output=True)
+        assert r.returncode == 2, (i, v)
+
+
+def test_cpp_vwap_large_qty_matches_python_past_int64_product():
+    # qty * cum reaches 2^103, far past int64: C++ must use 128-bit math to agree with Python ints.
+    p = _p()
+    px = [100.0 + i for i in range(13)]
+    vol = [2**49] * 13
+    o = _order(strategy=2, qty=2**53, prices=px, vols=vol)
+    got = ex.simulate([o], p)[0]
+    e = ex.reference_fill(o["side"], o["strategy"], o["qty"], px, vol, p)
+    assert (got["filled"], got["notional"], got["fees"], got["spread_cost"], got["impact_cost"], got["raw_notional"]) == e
+
+
+def test_cpp_fill_invariants_random():
+    rng = np.random.default_rng(23)
+    p = _p()
+    orders = []
+    for i in range(2000):
+        o = float(rng.uniform(20, 400))
+        px, vol = ex.make_slices(o, o * 1.02, o * 0.98, o * 1.01, int(rng.choice([0, 1, 1_000, 40_000_000])), 13)
+        orders.append({"id": i, "side": int(rng.choice([-1, 1])), "strategy": int(rng.integers(0, 3)),
+                       "qty": int(rng.choice([0, 1, 13, 2_000_000])), "prices": px, "vols": vol})
+    for o, r in zip(orders, ex.simulate(orders, p)):
+        assert 0 <= r["filled"] <= o["qty"]
+        assert (r["notional"] > 0) == (r["filled"] > 0)
+        assert r["fees"] >= 0 and r["spread_cost"] >= 0 and r["impact_cost"] >= 0
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

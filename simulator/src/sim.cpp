@@ -6,6 +6,9 @@
 //   then `slices` f64 prices, then `slices` i64 volumes.
 // Result record: i64 filled, f64 notional, f64 fees, f64 spread_cost, f64 impact_cost, f64 raw_notional.
 // Results are in input order; doubles round-trip exactly, so output is bit-exact with Python.
+// Input contract, enforced here because this is the process boundary: side is +-1; strategy is 0..2;
+// qty and volumes are in [0, 2^53] (exact as doubles); prices are finite and positive. Any violation,
+// a truncated record, or a bad argument exits with status 2 and a message on stderr.
 //
 // Child orders are scheduled per slice, shifted by `latency` slices, capped at max_part of the
 // slice volume (the remainder carries to the next slice), and priced at the slice price moved
@@ -31,10 +34,26 @@ static void die(const std::string& msg) {
     std::exit(2);
 }
 
-static void read_exact(void* dst, size_t bytes, bool at_boundary) {
+// Returns false on clean end of input at a record boundary; dies on a partial read.
+static bool read_exact(void* dst, size_t bytes, bool at_boundary) {
     const size_t got = std::fread(dst, 1, bytes, stdin);
-    if (got == 0 && at_boundary && std::feof(stdin)) std::exit(0);  // clean end of input at a record boundary
+    if (got == 0 && at_boundary && std::feof(stdin)) return false;
     if (got != bytes) die("truncated order record");
+    return true;
+}
+
+static double parse_double(const char* name, const char* text) {
+    char* end = nullptr;
+    const double v = std::strtod(text, &end);
+    if (end == text || *end != '\0' || !std::isfinite(v)) die(std::string("bad ") + name + ": " + text);
+    return v;
+}
+
+static int parse_int(const char* name, const char* text) {
+    char* end = nullptr;
+    const long v = std::strtol(text, &end, 10);
+    if (end == text || *end != '\0' || v < 0 || v > 1000000) die(std::string("bad ") + name + ": " + text);
+    return static_cast<int>(v);
 }
 
 // Writes the schedule for `vol[0..n)` into `s` (n entries).
@@ -44,28 +63,27 @@ static void schedule(int strategy, i64 qty, const i64* vol, int n, i64* s) {
         s[0] = qty;
     } else if (strategy == 1) {
         for (int i = 0; i < n; ++i) s[i] = qty / n + (i < qty % n ? 1 : 0);
-    } else if (strategy == 2) {
+    } else {  // 2, VWAP
         i64 total = 0;
         for (int i = 0; i < n; ++i) total += vol[i];
         if (total == 0) return;
         i64 cum = 0, prev = 0;
         for (int i = 0; i < n; ++i) {
             cum += vol[i];
-            const i64 cur = qty * cum / total;
+            // 128-bit product: qty * cum can pass 2^63, where Python's ints would not overflow.
+            const i64 cur = static_cast<i64>(static_cast<__int128>(qty) * cum / total);
             s[i] = cur - prev;
             prev = cur;
         }
-    } else {
-        die("unknown strategy " + std::to_string(strategy));
     }
 }
 
 int main(int argc, char** argv) {
     if (argc != 7) die("usage: sim <fee_bps> <spread_bps> <impact_bps> <max_part> <latency> <slices>");
-    const double fee = std::atof(argv[1]), spread = std::atof(argv[2]), impact = std::atof(argv[3]);
-    const double max_part = std::atof(argv[4]);
-    const int latency = std::atoi(argv[5]), n = std::atoi(argv[6]);
-    if (n <= 0 || latency < 0) die("bad slices or latency");
+    const double fee = parse_double("fee_bps", argv[1]), spread = parse_double("spread_bps", argv[2]);
+    const double impact = parse_double("impact_bps", argv[3]), max_part = parse_double("max_part", argv[4]);
+    const int latency = parse_int("latency", argv[5]), n = parse_int("slices", argv[6]);
+    if (fee < 0 || spread < 0 || impact < 0 || max_part <= 0 || max_part > 1 || n == 0) die("argument out of range");
 
     static char in_buf[1 << 20], out_buf[1 << 20];
     std::setvbuf(stdin, in_buf, _IOFBF, sizeof in_buf);
@@ -76,13 +94,19 @@ int main(int argc, char** argv) {
     const int skip = std::min(latency, n - 1), m = n - skip;
     std::vector<double> price(n);
     std::vector<i64> vol(n), sched(m);
-    for (;;) {
-        i64 head[3];
-        read_exact(head, sizeof head, true);
+    constexpr i64 kMaxExact = i64{1} << 53;
+    i64 head[3];
+    while (read_exact(head, sizeof head, true)) {
         const i64 side = head[0], strategy = head[1], qty = head[2];
-        if ((side != 1 && side != -1) || qty < 0) die("bad side or qty");
+        if (side != 1 && side != -1) die("bad side");
+        if (strategy < 0 || strategy > 2) die("unknown strategy " + std::to_string(strategy));
+        if (qty < 0 || qty > kMaxExact) die("qty out of range");
         read_exact(price.data(), n * sizeof(double), false);
         read_exact(vol.data(), n * sizeof(i64), false);
+        for (int i = 0; i < n; ++i) {
+            if (!(price[i] > 0.0) || !std::isfinite(price[i])) die("price must be finite and positive");
+            if (vol[i] < 0 || vol[i] > kMaxExact) die("volume out of range");
+        }
 
         schedule(static_cast<int>(strategy), qty, vol.data() + skip, m, sched.data());
         i64 carry = 0, filled = 0;
@@ -109,4 +133,6 @@ int main(int argc, char** argv) {
         const Result r{filled, notional, fees, spread_cost, impact_cost, raw_notional};
         std::fwrite(&r, sizeof r, 1, stdout);
     }
+    if (std::fflush(stdout) != 0 || std::ferror(stdout)) die("write failed");
+    return 0;
 }

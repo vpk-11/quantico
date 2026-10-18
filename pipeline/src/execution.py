@@ -145,6 +145,10 @@ def decompose_cost(
     return {"total": total, "drift": drift, "spread": spread_cost, "impact": impact_cost, "fees": fees}
 
 
+_RESULT = np.dtype([("filled", "<i8"), ("notional", "<f8"), ("fees", "<f8"),
+                    ("spread_cost", "<f8"), ("impact_cost", "<f8"), ("raw_notional", "<f8")])
+
+
 def simulate(orders: list[dict], p: dict) -> list[dict]:
     """Run the C++ simulator. Each order: id, side, strategy, qty, prices, vols. Returns results in order.
 
@@ -160,7 +164,10 @@ def simulate(orders: list[dict], p: dict) -> list[dict]:
         arr[key] = [o[key] for o in orders]
     args = [str(SIM_BIN), repr(p["fee_bps"]), repr(p["spread_bps"]), repr(p["impact_bps"]),
             repr(p["max_participation"]), str(p["latency_slices"]), str(n)]
-    out = subprocess.run(args, input=arr.tobytes(), capture_output=True, check=True).stdout
-    rec = np.frombuffer(out, dtype=[("filled", "<i8"), ("notional", "<f8"), ("fees", "<f8"),
-                                    ("spread_cost", "<f8"), ("impact_cost", "<f8"), ("raw_notional", "<f8")])
+    proc = subprocess.run(args, input=arr.tobytes(), capture_output=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"simulator exited {proc.returncode}: {proc.stderr.decode().strip()}")
+    out = proc.stdout
+    assert len(out) == len(orders) * _RESULT.itemsize, "simulator returned a short or long result stream"
+    rec = np.frombuffer(out, dtype=_RESULT)
     return [{"id": o["id"], **dict(zip(rec.dtype.names, r))} for o, r in zip(orders, rec.tolist())]
