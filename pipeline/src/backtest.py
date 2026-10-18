@@ -444,7 +444,7 @@ def _bench_orders(p: dict, n: int, seed: int) -> list[dict]:
 
 
 def bench(cfg: dict) -> int:
-    """Times the C++ subprocess (incl. startup + CSV I/O) against the Python reference loop at
+    """Times the C++ subprocess (incl. packing, startup + pipe I/O) against the Python reference loop at
     2k, 20k, and 200k orders, 3 repeats each, and writes reports/phase4_benchmark.md. No speed
     claim is made anywhere except from this table.
     """
@@ -468,13 +468,14 @@ def bench(cfg: dict) -> int:
               f"Python median {py_med:.3f}s (spread {py_spread:.3f})", flush=True)
     L = ["# Phase 4 benchmark: C++ simulator vs Python reference", "",
          "3 repeats per order count, median and spread (max minus min) across repeats, in seconds. "
-         "C++ timing includes subprocess startup and CSV I/O; Python is an in-process loop.", "",
+         "C++ timing includes Python-side packing, subprocess startup and binary pipe I/O; Python is an in-process loop on the same orders.", "",
          "| orders | C++ median (s) | C++ spread (s) | Python median (s) | Python spread (s) | faster |",
          "|---|---|---|---|---|---|"]
     for n, cm, cs, pm, ps in rows:
         L.append(f"| {n:,} | {cm:.3f} | {cs:.3f} | {pm:.3f} | {ps:.3f} | {'C++' if cm < pm else 'Python'} |")
-    L += ["", "No speed claim is made beyond this table. The case for the C++ simulator is an "
-          "independent, bit-exact-parity-checked implementation (see test_phase4.py), not raw speed.", ""]
+    L += ["", "The speed claim is limited to this table: end to end, on synthetic orders, with Python-side "
+          "packing included. The C++ simulator is also an independent, bit-exact-parity-checked "
+          "implementation (see test_phase4.py).", ""]
     BENCH_PATH.parent.mkdir(exist_ok=True)
     BENCH_PATH.write_text("\n".join(L))
     print(f"report: {BENCH_PATH}")

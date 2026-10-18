@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import math
 import subprocess
-import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -147,25 +146,21 @@ def decompose_cost(
 
 
 def simulate(orders: list[dict], p: dict) -> list[dict]:
-    """Run the C++ simulator. Each order: id, side, strategy, qty, prices, vols. Returns results in order."""
+    """Run the C++ simulator. Each order: id, side, strategy, qty, prices, vols. Returns results in order.
+
+    Orders go to the subprocess's stdin and results come back on stdout as raw binary records
+    (layout in simulator/src/sim.cpp); doubles round-trip exactly.
+    """
+    if not orders:
+        return []
     n = p["slices"]
-    with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
-        for o in orders:
-            assert len(o["prices"]) == n and len(o["vols"]) == n
-            f.write(",".join([str(o["id"]), str(o["side"]), str(o["strategy"]), str(o["qty"]),
-                              *(repr(x) for x in o["prices"]), *(str(v) for v in o["vols"])]) + "\n")
-    try:
-        args = [str(SIM_BIN), f.name, repr(p["fee_bps"]), repr(p["spread_bps"]), repr(p["impact_bps"]),
-                repr(p["max_participation"]), str(p["latency_slices"]), str(n)]
-        out = subprocess.run(args, capture_output=True, text=True, check=True).stdout
-    finally:
-        Path(f.name).unlink()
-    res = []
-    for line in out.splitlines():
-        oid, filled, notional, fees, spread_cost, impact_cost, raw_notional = line.split(",")
-        res.append({
-            "id": oid, "filled": int(filled), "notional": float(notional), "fees": float(fees),
-            "spread_cost": float(spread_cost), "impact_cost": float(impact_cost),
-            "raw_notional": float(raw_notional),
-        })
-    return res
+    arr = np.empty(len(orders), dtype=[("side", "<i8"), ("strategy", "<i8"), ("qty", "<i8"),
+                                       ("prices", "<f8", n), ("vols", "<i8", n)])
+    for key in ("side", "strategy", "qty", "prices", "vols"):
+        arr[key] = [o[key] for o in orders]
+    args = [str(SIM_BIN), repr(p["fee_bps"]), repr(p["spread_bps"]), repr(p["impact_bps"]),
+            repr(p["max_participation"]), str(p["latency_slices"]), str(n)]
+    out = subprocess.run(args, input=arr.tobytes(), capture_output=True, check=True).stdout
+    rec = np.frombuffer(out, dtype=[("filled", "<i8"), ("notional", "<f8"), ("fees", "<f8"),
+                                    ("spread_cost", "<f8"), ("impact_cost", "<f8"), ("raw_notional", "<f8")])
+    return [{"id": o["id"], **dict(zip(rec.dtype.names, r))} for o, r in zip(orders, rec.tolist())]
