@@ -25,4 +25,4 @@ jobs:
     with:
       python-version: '3.12'
       working-directory: 'pipeline'
-      test-cmd: 'pytest'
+      test-cmd: 'make -C ../simulator && pytest'
